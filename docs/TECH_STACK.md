@@ -26,7 +26,7 @@
 | **UI 组件**    | shadcn/ui                  | latest                  | 代码直接复制到项目，零抽象层，AI 可直接读写     |
 | **服务端状态** | TanStack Query             | v5                      | 缓存/重取/错误处理标准化                        |
 | **客户端状态** | Zustand                    | v5                      | 轻量，学习成本低                                |
-| **可观测**     | Langfuse                   | latest                  | LLM 链路追踪 + 评估一体化                       |
+| **可观测**             | Langfuse Cloud + Sentry    | langfuse-python ≥ 4.17.0 | LLM 链路追踪 + 评估一体化；读取走 Observations API v2          |
 | **评估框架**   | RAGAS                      | latest                  | 专为 RAG 设计，四大指标开箱即用                 |
 | **容器化**     | Docker + Docker Compose    | —                      | 一键起全栈                                      |
 | **缓存**       | Redis                      | 7.x                     | 会话、限流、热点缓存                            |
@@ -37,7 +37,7 @@
 
 **框架选型：LangGraph + LangChain**
 
-选择理由：LangGraph 是 LangChain 的“生产版”，提供显式状态管理和 checkpointing，适合复杂可控的工作流。LangChain 负责文档加载、分块、检索等 RAG 链路，两者配合使用。LlamaIndex 虽然 RAG 能力强，但本项目重点在 Agent 编排（多约束、多人群、反思校验），LangGraph 更匹配。
+选择理由：LangGraph 是 LangChain 的“生产版”，提供显式状态管理和 checkpointing，适合复杂可控的工作流。LangChain 负责文档加载、分块、检索等 RAG 链路，两者配合使用。LlamaIndex 虽然 RAG 能力强，但本项目重点在 Agent 编排（多约束、工具调用、反思校验），LangGraph 更匹配。
 
 **LangGraph 结构约束**：
 
@@ -58,7 +58,7 @@ Edges: 条件路由（信息不足→澄清，检索为空→放宽约束，校�
 
 **关键约束**：
 
-- LLM 不参与硬约束判断（过敏原、GI、钠等），由规则引擎判定
+- LLM 不参与硬约束判断（忌口/过敏原、时间、厨具等），由规则引擎判定
 - 每条推荐必须附 recipe_id，可追溯
 - 反思校验失败重试 ≤ 2 次，仍失败则降级返回安全候选
 
@@ -76,10 +76,10 @@ Edges: 条件路由（信息不足→澄清，检索为空→放宽约束，校�
 backend/
   api/            # 路由 + DTO，仅参数校验
   services/       # 业务编排，事务边界
-  domain/         # 实体、值对象、规则引擎、人群画像（纯逻辑，唯一无 IO 层）
+  domain/         # 实体、值对象、规则引擎、用户画像（纯逻辑，唯一无 IO 层）
     ports.py      # 所有 Protocol 接口（RecipeRepository / Retriever / LLMClient）
     rules/        # 规则引擎
-    profiles/     # 人群画像（general / fitness / diabetes 为 MVP）
+    profiles/     # 用户画像（口味、忌口、厨具、技能）
   agents/         # LangGraph 节点、工具、状态
   rag/            # 检索、重排、切分、索引（实现 domain.ports.Retriever）
   infra/          # DB、LLM 客户端、Redis（实现 domain.ports.*）
@@ -134,7 +134,9 @@ backend/
 
 **关键约束**：
 
-- Embedding 和重排模型通过本地部署（Ollama / HuggingFace transformers）
+- **远程优先、本地兜底**：Embedding（BGE-M3）与重排（bge-reranker-v2-m3）默认走 SiliconFlow / DeepSeek 等 OpenAI 兼容接口；远程失败或离线时回落 Ollama / sentence-transformers 本地推理
+- 两种实现都由 `domain/ports.py` 的 `EmbeddingClient` / `RerankClient` Protocol 约束，调用方不感知（`infra/` 出 Remote / Local / Fallback 三个实现）
+- trace 的 metadata 标注实际走了远程还是本地、是否触发降级，降级率可在 Langfuse 看板观察
 - LLM 通过 API 调用，保留 `LLMClient` 抽象层，便于切换
 - 单次推荐 Token 成本 ≤ ¥0.05
 
@@ -159,7 +161,7 @@ backend/
 
 **Langfuse + RAGAS** ✅
 
-Langfuse 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token），RAGAS 用于自动化评估（Faithfulness / Answer Relevancy / Context Precision / Context Recall）。两者配合使用，Langfuse 做可观测，RAGAS 做量化评估。未配置 Langfuse key 时自动降级为本地结构化日志，不阻塞本地开发。
+Langfuse 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token），RAGAS 用于自动化评估（Faithfulness / Answer Relevancy / Context Precision / Context Recall）。两者配合使用，Langfuse 做可观测，RAGAS 做量化评估。未配置 Langfuse key 时自动降级为本地结构化日志，不阻塞本地开发。 本项目实现：`infra/observability.py` 统一封装（SDK v4.17.0），key 缺失时降级为 no-op；读取 trace 一律用 Observations API v2。
 
 **评估指标约束**：
 

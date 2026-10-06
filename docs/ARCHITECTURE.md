@@ -29,22 +29,18 @@ mealcompass/
 │   │   └── feedback_service.py
 │   │
 │   ├── domain/               # 领域层：纯逻辑，无 IO，可单测（唯一无 IO 层）
-│   │   ├── ports.py          # 所有 Protocol：RecipeRepository / Retriever / LLMClient
+│   │   ├── ports.py          # 所有 Protocol：RecipeRepository / Retriever / LLMClient / EmbeddingClient / RerankClient
 │   │   ├── models/           # 实体、值对象
 │   │   ├── rules/            # 规则引擎
 │   │   │   ├── base.py       # Rule Protocol
-│   │   │   ├── allergen.py   # MVP（全人群「忌口」硬约束）
-│   │   │   ├── glycemic.py   # MVP（diabetes）
-│   │   │   ├── protein.py    # MVP（fitness）
-│   │   │   ├── sodium.py     # P1（hypertension）
+│   │   │   ├── allergen.py   # 忌口 / 过敏原硬约束
+│   │   │   ├── time_limit.py # 可用时间硬约束
+│   │   │   ├── tools.py      # 可用厨具硬约束
+│   │   │   ├── taste.py      # 口味 / 菜系软偏好
 │   │   │   └── registry.py   # 规则注册表
-│   │   └── profiles/         # 人群画像定义
-│   │       ├── base.py
-│   │       ├── general.py    # MVP
-│   │       ├── fitness.py    # MVP
-│   │       ├── diabetes.py   # MVP
-│   │       ├── child.py      # P1
-│   │       └── hypertension.py  # P1
+│   │   └── profiles/         # 用户画像定义
+│   │       ├── base.py       # UserProfile 值对象
+│   │       └── defaults.py   # 默认画像与口味标签
 │   │
 │   ├── agents/               # Agent 层：LangGraph 编排
 │   │   ├── state.py          # State 定义
@@ -149,7 +145,7 @@ api → services → domain
 | 模块                    | 职责                  | 对外接口                  | 依赖                          |
 | ----------------------- | --------------------- | ------------------------- | ----------------------------- |
 | **auth**          | 注册/登录/JWT         | `AuthService`           | infra.db, core.security       |
-| **profile**       | 画像 CRUD、人群路由   | `ProfileService`        | domain.profiles, infra.db     |
+| **profile**       | 画像 CRUD、约束集选择 | `ProfileService`        | domain.profiles, infra.db     |
 | **recipe**        | 菜谱 CRUD、详情、缩放 | `RecipeService`         | infra.db                      |
 | **rag**           | 检索、重排、索引      | `Retriever`（定义在 `domain/ports.py`） | infra.vector_store, infra.llm |
 | **agent**         | LangGraph 编排        | `run_agent(state)`      | rag, domain.rules, infra.llm  |
@@ -182,11 +178,9 @@ users (
 user_profiles (
   id UUID PK,
   user_id UUID FK,
-  cohort VARCHAR,              -- general/fitness/diabetes/child
-  goals JSONB,                 -- ["减脂","增肌"]
-  hard_constraints JSONB,      -- 规则 ID 列表
-  soft_preferences JSONB,
-  nutrition_targets JSONB,     -- {"calories":1800,"protein":120}
+  taste_preferences JSONB,     -- ["微辣","清淡","川菜"]
+  hard_constraints JSONB,      -- 规则 ID 列表（忌口/过敏、时间、厨具）
+  soft_preferences JSONB,      -- 软偏好（少油少盐、菜系等）
   tools_available JSONB,       -- ["炒锅","空气炸锅"]
   skill_level VARCHAR,
   updated_at TIMESTAMP
@@ -289,19 +283,24 @@ shopping_lists (
 ### 3.2 规则配置（YAML，不入库）
 
 ```yaml
-# data/rules/diabetes.yaml
-cohort: diabetes
+# data/rules/default.yaml
 hard_constraints:
-  - id: glycemic_index
-    field: nutrition.gi
+  - id: avoid_allergens        # 忌口 / 过敏原，命中即过滤
+    field: ingredients
+    operator: "not_in"
+    value_from_profile: allergies
+  - id: time_limit
+    field: time_minutes
     operator: "<="
-    value: 55
-  - id: sugar_limit
-    field: nutrition.sugar
-    operator: "<="
-    value: 10
+    value_from_profile: max_minutes
+  - id: tools_available
+    field: tools
+    operator: "subset_of"
+    value_from_profile: tools_available
 soft_preferences:
-  - id: prefer_whole_grain
+  - id: prefer_mild             # 口味偏好，加分而非过滤
+    field: tags
+    contains: 清淡
     boost: 1.2
 ```
 
@@ -330,7 +329,7 @@ CREATE INDEX ON recipes USING gin(tags);
 | ------------------- | ------------ | ---------------------------- |
 | JWT 签发与校验      | ✅           | 密钥不能暴露前端             |
 | 密码哈希            | ✅           | 同上                         |
-| 硬约束规则判定      | ✅           | 前端可篡改，健康约束必须可信 |
+| 硬约束规则判定      | ✅           | 前端可篡改，忌口/过敏约束必须可信 |
 | 过敏原/疾病禁忌过滤 | ✅           | 安全关键，不可信前端         |
 | LLM 调用            | ✅           | API Key 保护 + 成本控制      |
 | Embedding 计算      | ✅           | 模型权重 + 资源              |
@@ -384,6 +383,12 @@ async def run_agent(
 class LLMClient(Protocol):
     async def chat(self, messages: list[Message], **kwargs) -> str: ...
     async def structured(self, messages: list[Message], schema: type[BaseModel]) -> BaseModel: ...
+
+class EmbeddingClient(Protocol):
+    async def embed(self, texts: list[str]) -> list[list[float]]: ...
+
+class RerankClient(Protocol):
+    async def rerank(self, query: str, docs: list[str], top_k: int = 10) -> list[tuple[int, float]]: ...
 ```
 
 **接口约束**：
@@ -398,6 +403,7 @@ class LLMClient(Protocol):
 | ---- | ---------- | -------- | -------- |
 | v0.1 | 2026-10-06 | 初始草案 | 建立基线 |
 | v0.2 | 2026-10-06 | 统一跨文档冲突（人群范围、profiles 归属、接口位置、会话存储、工期）；补充接口清单 | 消除与 PRD/TECH_STACK/CONVENTIONS 的歧义 |
+| v0.3 | 2026-10-06 | **取消医学人群细分**，规则改为通用约束（忌口/时间/厨具/口味）；新增 EmbeddingClient / RerankClient 接口（远程优先、本地兜底） | 医学营养数据不可得，避免不可验证的约束 |
 
 **迭代规则**：
 
@@ -412,7 +418,7 @@ class LLMClient(Protocol):
 # 架构约束
 - 分层: api → services → domain / agents / rag → infra
 - domain 层不依赖任何其他层，纯逻辑
-- 人群画像放 `domain/profiles/`，跨层接口 Protocol 放 `domain/ports.py`
+- 用户画像放 `domain/profiles/`，跨层接口 Protocol 放 `domain/ports.py`
 - api 层不直接调 infra，必须经过 services
 - 同层模块不互相调用
 

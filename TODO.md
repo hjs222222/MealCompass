@@ -9,7 +9,7 @@
 ## 0. 怎么用这份清单
 
 - 文档间冲突已在 §1 定稿，并写入 `README.md` 的「全局约定（唯一口径）」——**以后所有文档、代码、AI 生成内容以那一节为准**。
-- 顺序原则（PRD §9）：**3 个人群做扎实 > 6 个人群半成品；评估与部署不可省，否则项目像玩具。**
+- 顺序原则（PRD §9）：**约束做扎实 > 功能堆砌；评估与部署不可省，否则项目像玩具。**
 - 每个任务都标了来源文档，方便回头对验收标准（DoD）。
 
 ---
@@ -23,7 +23,7 @@
 | D3 | 前端渲染 | 推荐 / 对话 / 购物清单 **CSR**；落地页 / 菜谱详情 / legal **SSR** | CONVENTIONS §3.2 |
 | D4 | 评估触发 | **先手动**（`scripts/eval.py`），M2 稳定后再入 CI | CONVENTIONS §7.3 |
 | D5 | 语音 | **Web Speech API**（客户端，零成本） | PRD F-E3 |
-| D6 | 人群范围 | **MVP 三人群 = `general` / `fitness` / `diabetes`**；儿童、高血压 P1；孕妇、痛风 P2。过敏原规则属 MVP | PRD §1.3 / F-D3 |
+| D6 | 目标用户 | **取消医学人群细分，面向所有普通人**（2026-10-06 决策）。约束只来自用户自己的忌口、可用时间、可用厨具与口味 | PRD §1.3 / §2 / 模块 D |
 | D7 | 登录方式 | **邮箱 + 密码 + JWT**，不做第三方 OAuth | PRD §1.5 / F-A1 |
 | D8 | 画像归属 | **`backend/domain/profiles/`**（domain 是唯一无 IO 层） | TECH_STACK §2.2 |
 | D9 | 前端目录 | **不用 `src/`**：`app/`、`components/ui/`、`lib/` | CONVENTIONS §1.2 / §3.3 |
@@ -32,8 +32,10 @@
 | D12 | 工期 | **总计 4-6 周**：M1 1-1.5 / M2 1.5-2 / M3 1-1.5 / M4 0.5-1 周 | README 路线图 / PRD §9 |
 | D13 | 可观测优先级 | Langfuse + Sentry 属 **MVP**，未配置 key 时**自动降级为本地日志** | CONVENTIONS §8.2 / TECH_STACK §2.6 |
 
-- [ ] **D14 菜谱数据来源与许可**（仍未定）：HowToCook / Food.com 等具体选哪个、能否再分发、GI/钠数据出处怎么标注（PRD F-B1、F-D2、F-D4、F-H6）
-- [ ] **D15 `reference/` 目录用途**（仍未定）：仓库里这个目录是空的，明确放什么或删掉
+- [x] **D14 菜谱数据来源与许可**：已定 —— **HowToCook**，License 为 **Unlicense（公有领域）**，可自由复制/修改/分发/商用，合规无风险。仓库已 pull 到 `HowToCook/`（373 道菜 + tips，Markdown 格式）
+- [x] **D15 `reference/` 用途**：已定 —— 存放参考资料，**目前尚未开始收集**（目录已可写）
+- [x] **D16 营养数据缺口**：已定 —— **放弃人群细分**。HowToCook 只提供预估热量与难度，没有蛋白质/GI/钠，不足以支撑医学约束；改为只展示热量、把「少油少盐低卡」降级为软偏好（PRD 模块 D、F-D4）
+- [x] **D17 远程优先 / 本地兜底**：已定（**模型线**）—— Embedding（BGE-M3）与重排（bge-reranker-v2-m3）默认走 SiliconFlow / DeepSeek 等 OpenAI 兼容接口；本地兜底用 Ollama / sentence-transformers；两者都由 `domain/ports.py` 的 Protocol 约束，trace 标注 provider 与降级
 
 ---
 
@@ -43,7 +45,7 @@
 - [ ] **P2 确定 Langfuse 形态**：自托管（docker）还是 Cloud，拿到 public/secret key（未配置也能开发，只是降级为本地日志）
 - [ ] **P3 确认机器资源**：bge-reranker-v2-m3 内存需求 ≥ 8GB；有 GPU 更好
 - [ ] **P4 解决模型下载**：BGE-M3 + reranker 走 ModelScope 镜像或 Ollama（TECH_STACK §6 避坑）
-- [ ] **P5 准备菜谱数据**：200+ 道结构化菜谱的来源、营养字段缺失率 ≤ 20%（PRD F-B1）
+- [x] **P5 菜谱数据**：HowToCook 已在本地（373 道菜，Markdown），License = **Unlicense（公有领域）**；按 D16 只取预估热量，不做营养推断
 - [ ] **P6 部署账号**：Vercel（前端）+ 云服务器（后端）+ 域名/HTTPS（PRD F-H5、§7）
 
 ---
@@ -52,8 +54,10 @@
 
 - [x] ~~**T0.1 建目录骨架**~~（部分完成：`docs/` 已建，`backend/` `frontend/` `data/` 待建）
 - [x] **T0.2 文档落地并改名**：已完成 —— `docs/{PRD,TECH_STACK,ARCHITECTURE,CONVENTIONS,UI_STYLE}.md` + 根 `README.md`
-- [ ] **T0.2b 删除旧目录 `goal/`**：内容已完整迁到 `docs/`，`goal/` 是过期副本（**需要你在资源管理器/IDE 里删，沙箱不让我删这个目录**）
+- [x] **T0.2b 删除旧目录 `goal/`**：已完成（已确认目录不存在）
 - [ ] **T0.3 补齐仓库根文件**：`LICENSE`(MIT)、`.gitignore`（含 `.idea/`）、`.env.example`（`README.md` 环境变量表全量）
+- [x] **T0.3a 密钥防泄漏**：`.gitignore`（含 `.env`、`langfuse.txt`、`.idea/`、`HowToCook/`）+ `.env`（真实密钥，已忽略）+ `.env.example` —— 已完成
+- [x] **T0.12 Langfuse 可观测接入**：`backend/core/config.py`、`backend/infra/observability.py`、`backend/scripts/trace_smoke.py`；已真实发送并**在 API 侧核验通过**（Observations API v2 读回 6 条观察）
 - [ ] **T0.4 写 `.cursorrules`**：合并 `TECH_STACK §4`、`ARCHITECTURE §7`、`CONVENTIONS §9.3` 三份约束
 - [ ] **T0.5 后端工具链**：`pyproject.toml`（ruff `line-length=120`、`target py311`、`select=["E","F","I","UP","B","SIM"]`；pytest + coverage ≥ 70%）、`uv` 初始化
 - [ ] **T0.6 前端工具链**：`package.json`、`tsconfig.json`（strict）、Tailwind v4（CSS-first `@theme`，**不产 `tailwind.config.js`**）、`npx shadcn@latest init`
@@ -71,9 +75,9 @@
 
 ### 4.1 数据层
 - [ ] **T1.1 建核心表** `[MVP]`：`users` / `user_profiles` / `recipes` / `recipe_steps` / `ingredients` / `ingredient_aliases` / `recipe_ingredients` / `recipe_embeddings` / `conversations` / `messages` / `feedbacks` / `shopping_lists`（UUID 主键、JSONB、向量 1024）
-- [ ] **T1.2 菜谱 schema 与入库脚本** `[MVP]`：`scripts/seed_recipes.py`，≥ 200 道（PRD F-B1）
+- [ ] **T1.2 HowToCook → JSON 入库脚本** `[MVP]`：`scripts/import_howtocook.py`。Markdown 结构映射：H1→菜名、首段→描述、`预估卡路里`→nutrition.calories、`预估烹饪难度`→difficulty、`## 必备原料和工具`→ingredients/tools、`## 计算`→每份用量、`## 操作`→steps、所在目录→category。**注意：HowToCook 无 time_minutes / protein / GI / sodium**（见 D16）
 - [ ] **T1.3 食材归一化** `[MVP]`：同义词表（番茄=西红柿），支持 LIKE + 全文检索
-- [ ] **T1.4 营养缺失标注** `[MVP]`：缺失率 ≤ 20%，缺失必须标注**不可编造**
+- [ ] **T1.4 热量字段处理** `[MVP]`：缺失即标注「未知」，**不可编造**；不做蛋白质 / GI / 钠推断
 - [ ] **T1.5 索引** `[MVP]`：HNSW(`m=16, ef_construction=64`) + `gin(tsv)` + `recipes(time_minutes)` + `gin(tags)`
 
 ### 4.2 RAG
@@ -99,26 +103,26 @@
 
 ---
 
-## 5. 阶段 M2（1.5-2 周）：规则引擎 + 人群 + LangGraph Agent + 评估集
+## 5. 阶段 M2（1.5-2 周）：规则引擎 + LangGraph Agent + 评估集
 
 来源：`docs/PRD.md` 模块 C/D、`docs/CONVENTIONS.md` §4、`docs/ARCHITECTURE.md` §2
 
 ### 5.1 规则引擎（domain 层，纯逻辑、零 IO）
 - [ ] **T2.1 `Rule` Protocol + 注册表** `[MVP]`：`domain/rules/{base,registry}.py`
 - [ ] **T2.2 规则 YAML 化** `[MVP]`：`data/rules/*.yaml`（hard_constraints 过滤 / soft_preferences 降权）
-- [ ] **T2.3 规则实现** `[MVP]`：allergen / glycemic / protein（MVP）+ sodium（P1）
-- [ ] **T2.4 规则优先级** `[MVP]`：冲突时 过敏 > 疾病 > 偏好（PRD §4.4）
+- [ ] **T2.3 规则实现** `[MVP]`：allergen / time_limit / tools（硬）+ taste（软）
+- [ ] **T2.4 规则优先级** `[MVP]`：冲突时 忌口/过敏 > 时间与厨具 > 口味偏好（PRD §4.4）
 - [ ] **T2.5 无解放宽** `[MVP]`：硬约束无解 → 返回「无匹配 + 放宽建议」，**绝不返回违规菜谱**
 - [ ] **T2.6 规则单测** `[MVP]`：每条规则覆盖正反用例，覆盖率 ≥ 70%
-- [ ] **T2.7 新增人群零代码** `[MVP]`：加 1 个 profile + 1 个 rules YAML 即可
+- [ ] **T2.7 新增约束零代码** `[MVP]`：加 1 条 rules YAML 即可
 
-### 5.2 人群（MVP 三人群）
-- [ ] **T2.8 general** `[MVP]`：无硬约束，口味/菜系软偏好
-- [ ] **T2.9 fitness** `[MVP]`：蛋白下限 + 热量区间；专项评估集 ≥ 20 条 query（PRD F-D1）
-- [ ] **T2.10 diabetes** `[MVP]`：GI / 碳水 / 糖上限；**缺失 GI 默认不推荐**（PRD F-D2）
-- [ ] **T2.11 child** `[P1]`：过敏原 + 年龄禁忌 +「亲子友好」排序（PRD F-D3）
-- [ ] **T2.12 hypertension** `[P1]`：钠上限 + 低盐替代（PRD F-D4）
-- [ ] **T2.13 画像路由** `[MVP]`：按画像自动选库/规则集，错误率 ≤ 5%（PRD F-D5）
+### 5.2 通用约束集（无人群细分）
+- [ ] **T2.8 忌口/过敏硬过滤** `[MVP]`：食材级，含同义词命中（PRD F-D1）
+- [ ] **T2.9 时间与厨具过滤** `[MVP]`：下推到检索层（PRD F-D2）
+- [ ] **T2.10 口味软偏好** `[MVP]`：辣度/清淡/菜系，YAML 可配（PRD F-D3）
+- [ ] **T2.11 热量展示与轻负担偏好** `[P1]`：展示 HowToCook 预估热量，不做数值门槛（PRD F-D4）
+- [ ] **T2.12 规则集与路由** `[MVP]`：规则集加载失败回落默认并告警（PRD F-D5）
+- [ ] **T2.13 画像驱动的规则集选择** `[MVP]`：错误率 ≤ 5%（PRD F-D5）
 - [ ] **T2.14 画像 CRUD** `[MVP]`：引导可跳过（默认 general）、编辑立即生效（PRD F-A2）
 - [ ] **T2.15 注册/登录** `[MVP]`：**邮箱 + 密码 + JWT**（注册/登录/登出/刷新）、bcrypt、多用户数据隔离（PRD F-A1）
 
@@ -128,6 +132,7 @@
 - [ ] **T2.18 条件边** `[MVP]`：信息不足→澄清；检索为空→放宽；校验失败→重试
 - [ ] **T2.19 持久化** `[MVP]`：`PostgresSaver`，`thread_id` ≤ 255 字符，禁 `MemorySaver`
 - [ ] **T2.20 查询理解** `[MVP]`：Pydantic schema 校验，失败重试 ≤ 2 次，抽取准确率 ≥ 90%（PRD F-C1）
+- [ ] **T2.35 Embedding/Rerank 双通道** `[MVP]`：远程优先（SiliconFlow/DeepSeek OpenAI 兼容）+ 本地兜底（Ollama/sentence-transformers），trace 标注 provider 与降级（D17）
 - [ ] **T2.21 澄清追问** `[MVP]`：缺关键约束才追问，≤ 2 轮，可跳过（PRD F-C2）
 - [ ] **T2.22 推荐生成** `[MVP]`：固定 3 道，含理由/缺失食材/替代/耗时，JSON 可直接渲染（PRD F-C3）
 - [ ] **T2.23 反思校验** `[MVP]`：过敏原/时间/厨具/热量四类；重试 ≤ 2 次后降级（PRD F-C4）
@@ -201,7 +206,7 @@
 
 | # | 原冲突 | 统一结论 | 改动落点 |
 | --- | --- | --- | --- |
-| ① | 儿童人群 P1 vs `[MVP]`；M2 只说「3 人群」 | MVP = general/fitness/diabetes；儿童 → P1；过敏原规则仍在 MVP | PRD §1.3 / F-D3 / §9；README 功能表与路线图 |
+| ① | 儿童人群 P1 vs `[MVP]`；M2 只说「3 人群」 | **已升级为产品决策：整块取消医学人群细分**（D6 / D16） | PRD §1.3 / §2 / 模块 D；README 全局约定 |
 | ② | `profiles/` 层级位置不一致 | 统一到 `domain/profiles/` | TECH_STACK §2.2/§4；PRD F-H1/§6；ARCHITECTURE §1/§2/§7 |
 | ③ | 前端 `src/` 前缀不一致 | 统一「不用 `src/`」 | CONVENTIONS §1.2/§3.3/§9.3；TECH_STACK §2.5 |
 | ④ | README 引用不存在的 `docs/*.md`；`ARCH.md` 名实不符 | 文档按规范名迁到 `docs/`，`ARCH.md` → `TECH_STACK.md` | 全部文件已迁移 |
@@ -219,13 +224,13 @@
 | 风险 | 应对 |
 | --- | --- |
 | 数据版权 | 只用开源/授权数据，标注来源 |
-| 健康合规 | 免责声明 + 非医疗建议 + 数据可删 |
+| 内容合规 | 免责声明 + 非医疗建议 + 数据可删 |
 | LLM 幻觉 | 引用强制 + 规则校验 + 反思重试 |
 | 范围膨胀 | 严格按 MVP/P1/P2 分级 |
 | 成本失控 | 限流 + 缓存 + 降级 |
 | 时间不足 | 优先保 MVP，P1 可延后 |
 
-**范围红线**：3 个人群做扎实 > 6 个人群半成品；P1 只挑 2-3 个做深；P2 全部写「未来工作」。
+**范围红线**：约束做扎实 > 功能堆砌；P1 只挑 2-3 个做深；P2 全部写「未来工作」。
 
 ---
 

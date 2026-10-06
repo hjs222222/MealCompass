@@ -1,0 +1,49 @@
+# ===== 密钥与本地环境（绝不入库）=====
+.env
+.env.*
+!.env.example
+langfuse.txt
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.egg-info/
+dist/
+build/
+
+# ===== Node / Next.js =====
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# ===== IDE / OS =====
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ===== 运行时与临时产物 =====
+*.log
+.tmp/
+data/eval/reports/
+
+# ===== 解析产物（由 backend/scripts/import_howtocook.py 生成，可随时重建，不入库）=====
+data/recipes/*.json
+
+# ===== 上游完整 clone（623 MB，已精简为 data/raw/howtocook，此目录待删除）=====
+# 必须写成 /HowToCook/ 锚定仓库根：否则 Windows 大小写不敏感会连 data/raw/howtocook/ 一起忽略
+/HowToCook/
+
+# ===== 本地缓存 =====
+.uvcache/

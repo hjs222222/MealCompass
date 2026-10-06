@@ -15,7 +15,7 @@ backend/
   domain/       # 领域层：纯逻辑，无 IO，可单测
     ports.py    # 所有 Protocol 接口（RecipeRepository / Retriever / LLMClient）
     rules/      # 规则引擎
-    profiles/   # 人群画像（general / fitness / diabetes 为 MVP）
+    profiles/   # 用户画像（口味、忌口、厨具、技能）
   agents/       # Agent 层：LangGraph 节点、工具、状态定义
   rag/          # RAG 层：检索、重排、切分、索引
   infra/        # 基础设施：DB、LLM 客户端、Redis、观测
@@ -29,7 +29,7 @@ backend/
 **规则**：
 
 - ✅ 按业务领域组织代码，不按文件类型组织
-- ✅ 人群画像放 `domain/profiles/`，跨层接口 Protocol 放 `domain/ports.py`
+- ✅ 用户画像放 `domain/profiles/`，跨层接口 Protocol 放 `domain/ports.py`
 - ❌ `api` 层不直接调 `infra`，必须经 `services`
 - ❌ `domain` 层不做 IO（不导入 DB、HTTP 客户端）
 - ❌ 同层模块不互相调用，通过 `services` 编排
@@ -90,12 +90,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class UserProfile(BaseModel):
     model_config = ConfigDict(from_attributes=True)  # ORM 模型用
     user_id: str
-    cohort: str = Field(..., min_length=1)
-    goals: list[str] = Field(default_factory=list)
+    taste_preferences: list[str] = Field(default_factory=list)
+    allergies: list[str] = Field(default_factory=list)
 
-    @field_validator("cohort")
+    @field_validator("taste_preferences")
     @classmethod
-    def validate_cohort(cls, v: str) -> str: ...
+    def dedupe_preferences(cls, v: list[str]) -> list[str]: ...
 ```
 
 **规则**：
@@ -257,6 +257,7 @@ graph = builder.compile(checkpointer=checkpointer)
 **规则**：
 
 - 硬约束下推到检索层（SQL `WHERE` / 向量过滤），不在检索后过滤
+- 模型调用（Embedding / 重排）实行**远程优先、本地兜底**：默认走 OpenAI 兼容的远程接口，失败或离线时回落本地推理；调用方只依赖 `domain/ports.py` 的 Protocol，并在 trace metadata 里标注 provider 与是否降级
 - 生成必须引用 `recipe_id`，禁止编造知识库外内容
 - 反思校验失败重试 ≤ 2 次，仍失败降级返回安全候选
 - 温度参数设为 0.1 以减少幻觉
@@ -283,6 +284,32 @@ async def search_recipes(query: str, filters: dict, top_k: int = 10) -> list[dic
 - 每个工具必须有 docstring（LLM 依赖它理解工具用途）
 - 工具必须有超时和异常兜底
 - 新增工具 = 新增文件 + 注册，不改主流程
+
+### 4.5 可观测（Langfuse）
+
+- **唯一出口** `infra/observability.py`；业务代码不得直接 `import langfuse`。
+- **先加载 `.env`，再 import langfuse** —— 顺序错了 SDK 会用空凭证初始化（官方 Common Mistakes）。
+- 未配置 key 时整体降级为 no-op，本地开发不被可观测性阻塞。
+- 观察名是**稳定 API**（评估器、看板、过滤器都按名字匹配），只能取 `SpanName` 常量，禁止在调用点手写字符串：
+
+| 常量 | 观察名 | 类型 |
+| ---- | ------ | ---- |
+| `RECOMMEND_REQUEST` | `recommend-request` | span（根；一个推荐请求 = 一个 trace） |
+| `PARSE_INTENT` | `parse-intent` | span |
+| `RETRIEVE_RECIPES` | `retrieve-recipes` | retriever |
+| `RERANK_RECIPES` | `rerank-recipes` | span |
+| `FILTER_HARD_CONSTRAINTS` | `apply-hard-constraints` | span |
+| `GENERATE_RECOMMENDATIONS` | `generate-recommendations` | generation |
+| `REFLECT_VALIDATE` | `reflect-validate` | span |
+| `TOOL_*` | `tool-*` | tool |
+
+- 命名规则：**动词开头、低基数、不含动态值**；动态信息进 metadata。
+- LLM 调用必须记为 `generation` 并带 `model` + `usage_details`，否则成本 / Token 视图为空。
+- 根观察必须显式设置 input / output，且只放用户看得懂的内容（不要塞函数参数）。
+- 每个 trace 带 `user_id` / `session_id` / `environment` / `tags`（用 `attributes()`）。
+- 短生命周期进程（脚本、离线评估）结束前必须 `flush()`。
+- ⚠️ **读取 trace 一律走 Observations API v2**（`client.api.observations.get_many`）。2026-09-16 之后创建的 Langfuse 组织访问旧 `/api/public/traces` 会返回 `410 LEGACY_API_UNAVAILABLE_FOR_NEW_ORGANIZATION`。
+- 密钥、密码、完整用户身份、真实联系方式**绝不进 trace**；忌口/过敏原等敏感个人数据进 metadata 前先脱敏或只记数量
 
 ## 五、数据库规范
 
@@ -381,7 +408,7 @@ fix/xxx       # 修复分支
 ```
 <type>: <description>
 
-feat: 新增糖尿病人群规则引擎
+feat: 新增忌口规则引擎
 fix: 修复 pgvector HNSW 索引未命中问题
 docs: 更新 API 接口文档
 refactor: 将检索逻辑从 api 层移至 rag 层
@@ -447,6 +474,8 @@ services:
 | `JWT_SECRET`          | ✅   | JWT 密钥          |
 | `LANGFUSE_PUBLIC_KEY` | ✅   | 可观测（可留空，留空即降级为本地日志） |
 | `LANGFUSE_SECRET_KEY` | ✅   | 可观测（可留空，留空即降级为本地日志） |
+| `LANGFUSE_BASE_URL`    | ✅   | JP: https://jp.cloud.langfuse.com |
+| `LANGFUSE_TRACING_ENVIRONMENT` | ✅ | dev / staging / production |
 | `SENTRY_DSN`          | P1   | 异常上报（可留空） |
 
 ## 九、参考资料
@@ -489,7 +518,7 @@ services:
 
 # 架构
 - 分层: api → services → domain/agents/rag → infra (单向)
-- 人群画像放 domain/profiles/，接口 Protocol 放 domain/ports.py
+- 用户画像放 domain/profiles/，接口 Protocol 放 domain/ports.py
 - domain 层不做 IO, api 层不写业务逻辑
 - shadcn/ui 组件必须放在 components/ui/（项目不用 src/ 前缀）
 
