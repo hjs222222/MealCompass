@@ -1,0 +1,3 @@
+# 测试用非法词典：canonical 为空，加载器必须报错而不是静默降级
+version: 1
+canonical: []

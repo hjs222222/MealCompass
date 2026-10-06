@@ -30,6 +30,14 @@ class Ingredient(BaseModel):
     note: str | None = None
     optional: bool = False
     per_serving: bool = False
+    canonical: str | None = Field(
+        default=None,
+        description="归一化后的标准食材名（词表未收录时为 None，绝不猜）",
+    )
+    category: str | None = Field(
+        default=None,
+        description="食材分类：蔬果 / 肉类 / 水产 / 蛋奶 / 主食 / 豆制品 / 调料 / 干货 / 其他",
+    )
 
 
 class Recipe(BaseModel):

@@ -80,6 +80,10 @@
 
 > 新功能必须**先写失败测试再实现**（TDD，见 `docs/CONVENTIONS.md` §6）。覆盖率目标 ≥ 70%。
 > `-p no:cacheprovider` 是因为沙箱里 `.pytest_cache` 建不出来。
+>
+> **沙箱跑测试的两条硬规矩**（本机实测，踩过）：
+> 1. 跑之前把临时目录指到工作区内：`$env:TEMP='<仓库>\.tmp'`；否则 pytest 会因为写 `C:\Windows\Temp` 被拒。
+> 2. **不要用 `tmp_path` fixture**（它同样写系统临时目录）。需要测试数据时，把文件放 `backend/tests/fixtures/` 下，用 `Path(__file__).resolve().parents[1] / "fixtures" / "xxx.yaml"` 读取。
 
 ```powershell
 # 在 frontend/ 下（前端就绪后）
@@ -133,6 +137,7 @@ pnpm typecheck && pnpm lint && pnpm build
 | 改菜谱解析 | `backend/scripts/import_howtocook.py` + `backend/tests/unit/test_import_howtocook.py` + `docs/DATA_SOURCES.md` |
 | 加/改领域模型 | `backend/domain/models/` + `docs/ARCHITECTURE.md` §3.1 |
 | 加可观测埋点 | `backend/infra/observability.py` 的 `SpanName` + `docs/CONVENTIONS.md` §4.5 |
+| 加/改食材词表 | `data/ingredients/aliases.yaml` + `backend/domain/ingredients.py` + `import_report.json` 的 `unmapped_top` |
 | 加规则 | `data/rules/*.yaml` + `backend/domain/rules/` + `docs/PRD.md` 模块 D |
 | 查 Langfuse 数据 | 用 `langfuse` 技能；读取走 **Observations API v2**（旧 `/api/public/traces` 对本组织返回 410） |
 

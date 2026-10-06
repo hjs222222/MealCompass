@@ -35,7 +35,9 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from domain.ingredients import IngredientDictionary  # noqa: E402
 from domain.models.recipe import Ingredient, Recipe  # noqa: E402
+from infra.ingredient_dict import load_dictionary  # noqa: E402
 
 # --------------------------------------------------------------------------- 常量
 
@@ -407,7 +409,22 @@ def _steps(body: str) -> list[str]:
     return [step for step in steps if step]
 
 
-def parse_recipe_markdown(text: str, *, source_path: str) -> Recipe:
+def _normalize(item: Ingredient, dictionary: IngredientDictionary | None) -> Ingredient:
+    """给食材补上标准名与分类；词表未收录就保持 ``None``（不编造）。"""
+    if dictionary is None or item.kind != "ingredient":
+        return item
+    entry = dictionary.resolve(item.name)
+    if entry is None:
+        return item
+    return item.model_copy(update={"canonical": entry.name, "category": entry.category})
+
+
+def parse_recipe_markdown(
+    text: str,
+    *,
+    source_path: str,
+    dictionary: IngredientDictionary | None = None,
+) -> Recipe:
     """把一篇 HowToCook markdown 解析成 :class:`Recipe`。
 
     缺少标准章节时抛 ``ValueError``（让导入器记录失败而不是产出残缺数据）。
@@ -442,6 +459,7 @@ def parse_recipe_markdown(text: str, *, source_path: str) -> Recipe:
                 if item.name not in tools:
                     tools.append(item.name)
                 continue
+            item = _normalize(item, dictionary)
             if authoritative:
                 ingredients[item.name] = item
             else:
@@ -483,8 +501,18 @@ def iter_recipe_files(root: Path) -> list[Path]:
     )
 
 
-def import_all(root: Path, *, limit: int | None = None) -> tuple[list[Recipe], dict]:
-    """解析整个数据集，返回 (菜谱列表, 报告)。"""
+def import_all(
+    root: Path,
+    *,
+    limit: int | None = None,
+    dictionary: IngredientDictionary | None = None,
+) -> tuple[list[Recipe], dict]:
+    """解析整个数据集，返回 (菜谱列表, 报告)。
+
+    ``dictionary`` 缺省时读取 ``data/ingredients/aliases.yaml``（见 T1.3）。
+    """
+    if dictionary is None:
+        dictionary = load_dictionary()
     files = iter_recipe_files(root)
     if limit:
         files = files[:limit]
@@ -493,12 +521,18 @@ def import_all(root: Path, *, limit: int | None = None) -> tuple[list[Recipe], d
     failures: list[dict[str, str]] = []
     unresolved: list[dict[str, str]] = []
     missing_images: list[dict[str, str]] = []
+    unmapped: Counter[str] = Counter()
+    normalized_count = 0
     tool_candidates: Counter[str] = Counter()
 
     for path in files:
         source_path = path.relative_to(root).as_posix()
         try:
-            recipe = parse_recipe_markdown(path.read_text(encoding="utf-8"), source_path=source_path)
+            recipe = parse_recipe_markdown(
+                path.read_text(encoding="utf-8"),
+                source_path=source_path,
+                dictionary=dictionary,
+            )
         except ValueError as exc:
             failures.append({"path": source_path, "reason": str(exc)})
             continue
@@ -506,6 +540,10 @@ def import_all(root: Path, *, limit: int | None = None) -> tuple[list[Recipe], d
         for item in recipe.ingredients:
             if item.amount_min is None and item.amount_text:
                 unresolved.append({"path": source_path, "line": item.name, "amount_text": item.amount_text})
+            if item.canonical is None:
+                unmapped[item.name] += 1
+            else:
+                normalized_count += 1
         for image in recipe.images:
             if not (root / image).exists():
                 missing_images.append({"path": source_path, "image": image})
@@ -524,6 +562,12 @@ def import_all(root: Path, *, limit: int | None = None) -> tuple[list[Recipe], d
         "calories_coverage": sum(1 for r in recipes if r.calories_kcal is not None),
         "ingredients_total": sum(len(r.ingredients) for r in recipes),
         "ingredients_unique": len({i.name for r in recipes for i in r.ingredients}),
+        "ingredients_normalized": normalized_count,
+        "ingredients_normalization_rate": round(
+            normalized_count / max(1, sum(len(r.ingredients) for r in recipes)) * 100, 1
+        ),
+        "ingredients_unmapped_unique": len(unmapped),
+        "unmapped_top": unmapped.most_common(30),
         "tools_unique": dict(sorted(tool_candidates.items(), key=lambda kv: (-kv[1], kv[0]))),
         "unresolved_amount_count": len(unresolved),
         "unresolved_amount_samples": unresolved[:20],
@@ -565,6 +609,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  分类       : {report['categories']}")
     print(f"  难度/热量  : {report['difficulty_coverage']} / {report['calories_coverage']} 有值")
     print(f"  食材       : {report['ingredients_total']} 条，去重 {report['ingredients_unique']} 种")
+    print(
+        f"  归一化     : {report['ingredients_normalized']} 条命中"
+        f"（{report['ingredients_normalization_rate']}%），未收录 {report['ingredients_unmapped_unique']} 种"
+    )
     print(f"  厨具识别   : {len(report['tools_unique'])} 种 -> {list(report['tools_unique'])[:12]}")
     print(
         f"  配图       : {report['recipes_with_images']} 道菜有图，共 {report['images_total']} 张"

@@ -320,6 +320,7 @@ async def search_recipes(query: str, filters: dict, top_k: int = 10) -> list[dic
 - 时间字段统一 `TIMESTAMP WITH TIME ZONE`
 - JSON 字段用 `JSONB`（非 `JSON`）
 - 向量维度固定 1024（BGE-M3）
+- 食材归一化词典放 `data/ingredients/aliases.yaml`：只合并同一食材的不同叫法，**风味/品种不同的不合并**；别名不得跨条目重复（加载时会报错）；新增条目后重跑 `scripts/import_howtocook.py` 看 `import_report.json` 的 `unmapped_top`
 
 ### 5.2 pgvector 索引
 
@@ -550,6 +551,7 @@ services:
 | v1.0 | 2026-10-06 | 初始版本 | 建立开发规范基线 |
 | v1.1 | 2026-10-06 | 统一跨文档冲突；补充渲染策略、Tailwind v4、会话存储、环境变量清单 | 与 README、ARCHITECTURE、TECH_STACK 对齐，消除歧义 |
 | v1.2 | 2026-10-06 | 指向 `AGENTS.md` 作为 AI 入口；配图入库约定 | 让 AI 工具的阅读顺序与收尾流程有唯一出处 |
+| v1.3 | 2026-10-06 | 补充食材归一化词典的存放位置与维护规则 | T1.3 落地，避免词表散落在代码里 |
 
 **迭代规则**：
 

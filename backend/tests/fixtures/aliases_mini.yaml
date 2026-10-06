@@ -1,0 +1,8 @@
+# 测试用迷你词典（对应 tests/unit/test_ingredient_normalizer.py）
+version: 1
+canonical:
+  - name: 番茄
+    category: 蔬果
+    aliases: [西红柿, 蕃茄]
+  - name: 盐
+    category: 调料

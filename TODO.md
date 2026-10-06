@@ -79,7 +79,8 @@
 - [ ] **T1.1 建核心表** `[MVP]`：`users` / `user_profiles` / `recipes` / `recipe_steps` / `ingredients` / `ingredient_aliases` / `recipe_ingredients` / `recipe_embeddings` / `conversations` / `messages` / `feedbacks` / `shopping_lists`（UUID 主键、JSONB、向量 1024）
 - [x] **T1.2 HowToCook → JSON 入库脚本**：`scripts/import_howtocook.py`，372/372 解析成功、34→38 个单测全绿。三种用量语法（`名称 400 g` / `名称 = 2 斤` / `名称 15g*份数`）已覆盖；86 条上游没给数字的用量按「不编造」留原文
 - [x] **T1.2b 菜谱模型加 images 字段**：`Recipe.images`（数据集内相对路径，346 张，0 缺失）+ `Recipe.external_images`（2 条外链）；含括号文件名（`石凉粉(冰粉)成品1.jpg`）已正确处理
-- [ ] **T1.3 食材归一化** `[MVP]`：同义词表（番茄=西红柿），支持 LIKE + 全文检索
+- [x] **T1.3 食材归一化**：`data/ingredients/aliases.yaml`（112 个标准食材 / 别名）+ `domain/ingredients.py`（纯逻辑）+ `infra/ingredient_dict.py`（加载）。`Ingredient` 落 `canonical` / `category`；**命中率 73.5%**（2867/3902 条），未收录 856 种已按频次进 `import_report.json` 的 `unmapped_top`
+- [ ] **T1.3b 词表扩充** `[P1]`：按 `unmapped_top` 频次继续补（当前头部是冷门香料与地方食材，长尾收益递减）
 - [ ] **T1.4 热量字段处理** `[MVP]`：缺失即标注「未知」，**不可编造**；不做蛋白质 / GI / 钠推断
 - [ ] **T1.5 索引** `[MVP]`：HNSW(`m=16, ef_construction=64`) + `gin(tsv)` + `recipes(time_minutes)` + `gin(tags)`
 

@@ -1,0 +1,380 @@
+# 食材归一化词典（T1.3）
+#
+# 用途：
+#   1. 把 HowToCook 里五花八门的食材写法收敛到标准名（番茄 = 西红柿）
+#   2. 作为 ingredients / ingredient_aliases 表的种子数据（docs/ARCHITECTURE.md §3.1）
+#   3. 支撑忌口/过敏过滤的同义词命中（PRD F-D1）与购物清单合并（PRD F-F1）
+#
+# 维护规则（重要）：
+#   - 只合并「同一食材的不同叫法」；**风味 / 品种不同的一律不合并**
+#     （生抽 ≠ 老抽，大葱 ≠ 小葱，黑胡椒 ≠ 白胡椒，柠檬 ≠ 青柠）
+#   - 别名不得跨条目重复：构造词典时会直接抛 ValueError
+#   - category 取值：蔬果 / 肉类 / 水产 / 蛋奶 / 主食 / 豆制品 / 调料 / 干货 / 其他
+#   - 新增条目后重跑 `backend/scripts/import_howtocook.py`，看报告里「未归一化」数量是否下降
+
+version: 1
+canonical:
+  # ============================ 调料 ============================
+  - name: 盐
+    category: 调料
+    aliases: [食盐, 食用盐, 精盐, 细盐, 海盐]
+  - name: 生抽
+    category: 调料
+    aliases: [酱油, 生抽酱油, 黄豆酱油]
+  - name: 老抽
+    category: 调料
+    aliases: [红烧酱油, 草菇老抽]
+  - name: 食用油
+    category: 调料
+    aliases: [油, 植物油, 色拉油, 玉米油, 花生油, 葵花籽油, 大豆油, 菜籽油, 橄榄油]
+  - name: 香油
+    category: 调料
+    aliases: [芝麻油, 麻油]
+  - name: 蚝油
+    category: 调料
+    aliases: []
+  - name: 料酒
+    category: 调料
+    aliases: [黄酒, 花雕酒, 绍兴酒, 烹饪黄酒, 米酒]
+  - name: 白砂糖
+    category: 调料
+    aliases: [白糖, 糖, 砂糖, 细砂糖, 绵白糖]
+  - name: 冰糖
+    category: 调料
+    aliases: [黄冰糖, 单晶冰糖, 多晶冰糖]
+  - name: 淀粉
+    category: 调料
+    aliases: [生粉, 玉米淀粉, 土豆淀粉, 红薯淀粉, 木薯淀粉, 太白粉]
+  - name: 鸡精
+    category: 调料
+    aliases: [鸡粉, 鸡粉调味料]
+  - name: 味精
+    category: 调料
+    aliases: [谷氨酸钠]
+  - name: 胡椒粉
+    category: 调料
+    aliases: [白胡椒粉, 胡椒]
+  - name: 黑胡椒粉
+    category: 调料
+    aliases: [黑胡椒, 黑胡椒碎, 现磨黑胡椒]
+  - name: 五香粉
+    category: 调料
+    aliases: [十三香]
+  - name: 辣椒粉
+    category: 调料
+    aliases: [辣椒面, 粗辣椒面, 细辣椒面, 红辣椒粉, 辣椒碎]
+  - name: 孜然粉
+    category: 调料
+    aliases: [孜然, 孜然粒]
+  - name: 豆瓣酱
+    category: 调料
+    aliases: [郫县豆瓣, 郫县豆瓣酱, 红油豆瓣, 豆瓣]
+  - name: 番茄酱
+    category: 调料
+    aliases: [蕃茄酱, 番茄沙司, 番茄膏]
+  - name: 醋
+    category: 调料
+    aliases: [香醋, 陈醋, 米醋, 白醋, 镇江香醋, 糯米醋]
+  - name: 蜂蜜
+    category: 调料
+    aliases: []
+  - name: 甜面酱
+    category: 调料
+    aliases: [甜酱]
+  - name: 黄豆酱
+    category: 调料
+    aliases: [大豆酱, 干黄酱]
+  - name: 泡椒
+    category: 调料
+    aliases: [泡辣椒]
+  - name: 辣椒油
+    category: 调料
+    aliases: [红油, 辣椒红油]
+  - name: 花椒
+    category: 调料
+    aliases: [红花椒, 青花椒, 麻椒, 花椒粒]
+  - name: 八角
+    category: 调料
+    aliases: [大料, 八角茴香]
+  - name: 桂皮
+    category: 调料
+    aliases: [肉桂, 肉桂皮]
+  - name: 香叶
+    category: 调料
+    aliases: [月桂叶]
+  - name: 芝麻
+    category: 调料
+    aliases: [白芝麻, 黑芝麻, 熟芝麻, 生芝麻]
+
+  # ============================ 蔬果 ============================
+  - name: 番茄
+    category: 蔬果
+    aliases: [西红柿, 蕃茄, 洋柿子]
+  - name: 土豆
+    category: 蔬果
+    aliases: [马铃薯, 洋芋]
+  - name: 胡萝卜
+    category: 蔬果
+    aliases: [红萝卜]
+  - name: 白萝卜
+    category: 蔬果
+    aliases: [萝卜]
+  - name: 洋葱
+    category: 蔬果
+    aliases: [圆葱, 紫洋葱, 白洋葱, 球葱]
+  - name: 姜
+    category: 蔬果
+    aliases: [生姜, 老姜, 子姜, 姜块]
+  - name: 大蒜
+    category: 蔬果
+    aliases: [蒜, 蒜瓣, 蒜头, 蒜子, 独头蒜]
+  - name: 小葱
+    category: 蔬果
+    aliases: [葱, 香葱, 细香葱]
+  - name: 大葱
+    category: 蔬果
+    aliases: [京葱, 葱白]
+  - name: 香菜
+    category: 蔬果
+    aliases: [芫荽, 胡荽, 香菜粉, 香菜末]
+  - name: 青椒
+    category: 蔬果
+    aliases: [柿子椒, 灯笼椒, 菜椒]
+  - name: 小米辣
+    category: 蔬果
+    aliases: [小米椒, 朝天椒, 指天椒]
+  - name: 干辣椒
+    category: 蔬果
+    aliases: [辣椒干, 干红辣椒]
+  - name: 白菜
+    category: 蔬果
+    aliases: [大白菜]
+  - name: 菠菜
+    category: 蔬果
+    aliases: []
+  - name: 芹菜
+    category: 蔬果
+    aliases: [西芹, 香芹]
+  - name: 黄瓜
+    category: 蔬果
+    aliases: [青瓜, 胡瓜]
+  - name: 茄子
+    category: 蔬果
+    aliases: [长茄子, 圆茄子, 紫茄子]
+  - name: 西兰花
+    category: 蔬果
+    aliases: [西蓝花, 绿花菜]
+  - name: 豆角
+    category: 蔬果
+    aliases: [四季豆, 豇豆, 长豆角, 刀豆]
+  - name: 冬瓜
+    category: 蔬果
+    aliases: []
+  - name: 苦瓜
+    category: 蔬果
+    aliases: [凉瓜]
+  - name: 藕
+    category: 蔬果
+    aliases: [莲藕]
+  - name: 韭菜
+    category: 蔬果
+    aliases: []
+  - name: 豆芽
+    category: 蔬果
+    aliases: [黄豆芽, 绿豆芽]
+  - name: 柠檬
+    category: 蔬果
+    aliases: [柠檬汁, 柠檬皮]
+  - name: 青柠
+    category: 蔬果
+    aliases: [莱姆, 青柠檬]
+  - name: 玉米
+    category: 蔬果
+    aliases: [甜玉米, 玉米粒, 玉米棒]
+
+  # ============================ 蛋奶 ============================
+  - name: 鸡蛋
+    category: 蛋奶
+    aliases: [土鸡蛋, 柴鸡蛋, 蛋液]
+  - name: 牛奶
+    category: 蛋奶
+    aliases: [纯牛奶, 鲜奶, 全脂牛奶]
+  - name: 黄油
+    category: 蛋奶
+    aliases: [无盐黄油, 有盐黄油, 动物黄油]
+  - name: 淡奶油
+    category: 蛋奶
+    aliases: [动物性淡奶油, 稀奶油]
+  - name: 芝士
+    category: 蛋奶
+    aliases: [奶酪, 马苏里拉, 马苏里拉芝士, 芝士片, 干酪]
+  - name: 炼乳
+    category: 蛋奶
+    aliases: [炼奶]
+
+  # ============================ 肉类 ============================
+  - name: 五花肉
+    category: 肉类
+    aliases: [带皮五花肉, 三层肉, 五花]
+  - name: 猪肉
+    category: 肉类
+    aliases: [猪瘦肉, 瘦肉, 猪里脊, 里脊肉]
+  - name: 排骨
+    category: 肉类
+    aliases: [猪排骨, 肋排, 小排]
+  - name: 牛肉
+    category: 肉类
+    aliases: [牛里脊, 牛腱子, 牛肉片, 瘦牛肉]
+  - name: 牛腩
+    category: 肉类
+    aliases: [坑腩, 牛腩肉]
+  - name: 鸡腿
+    category: 肉类
+    aliases: [鸡大腿, 琵琶腿, 鸡腿肉]
+  - name: 鸡胸肉
+    category: 肉类
+    aliases: [鸡胸, 鸡脯肉]
+  - name: 鸡翅
+    category: 肉类
+    aliases: [鸡翅中, 鸡中翅, 翅中, 鸡全翅]
+  - name: 鸡肉
+    category: 肉类
+    aliases: [整鸡, 三黄鸡, 土鸡]
+  - name: 培根
+    category: 肉类
+    aliases: [烟肉]
+  - name: 香肠
+    category: 肉类
+    aliases: [腊肠, 广式腊肠]
+  - name: 火腿
+    category: 肉类
+    aliases: [火腿片, 金华火腿]
+
+  # ============================ 水产 ============================
+  - name: 虾
+    category: 水产
+    aliases: [基围虾, 明虾, 大虾, 白虾, 鲜虾]
+  - name: 虾仁
+    category: 水产
+    aliases: [去壳虾, 虾肉]
+  - name: 鱼肉
+    category: 水产
+    aliases: [鱼片, 鱼]
+
+  # ============================ 主食 ============================
+  - name: 米饭
+    category: 主食
+    aliases: [白米饭, 剩米饭, 熟米饭]
+  - name: 面粉
+    category: 主食
+    aliases: [中筋面粉, 普通面粉, 小麦粉, 高筋面粉, 低筋面粉]
+  - name: 面条
+    category: 主食
+    aliases: [挂面, 鲜面条, 拉面, 面]
+  - name: 糯米粉
+    category: 主食
+    aliases: [江米粉]
+  - name: 面包
+    category: 主食
+    aliases: [吐司, 吐司面包, 面包片]
+
+  # ============================ 豆制品 ============================
+  - name: 豆腐
+    category: 豆制品
+    aliases: [老豆腐, 嫩豆腐, 北豆腐, 南豆腐, 内酯豆腐]
+  - name: 豆浆
+    category: 豆制品
+    aliases: []
+  - name: 豆干
+    category: 豆制品
+    aliases: [香干, 豆腐干]
+  - name: 腐竹
+    category: 豆制品
+    aliases: []
+
+  # ============================ 干货 ============================
+  - name: 花生
+    category: 干货
+    aliases: [花生米, 花生仁, 生花生, 熟花生]
+  - name: 红枣
+    category: 干货
+    aliases: [大枣, 干枣]
+  - name: 枸杞
+    category: 干货
+    aliases: [枸杞子, 干枸杞]
+  - name: 银耳
+    category: 干货
+    aliases: [白木耳, 雪耳]
+  - name: 紫菜
+    category: 干货
+    aliases: [海苔, 紫菜片]
+  - name: 木耳
+    category: 干货
+    aliases: [黑木耳, 干木耳, 云耳]
+  - name: 香菇
+    category: 干货
+    aliases: [冬菇, 花菇, 鲜香菇]
+
+  # ============================ 其他 ============================
+  - name: 水
+    category: 其他
+    aliases: [清水, 开水, 温水, 凉水, 冷水, 饮用水, 纯净水, 矿泉水, 冰块, 冰水, 热水]
+  - name: 啤酒
+    category: 其他
+    aliases: []
+  - name: 白酒
+    category: 其他
+    aliases: [高度白酒, 二锅头]
+  - name: 高汤
+    category: 其他
+    aliases: [鸡汤, 骨汤, 猪骨高汤]
+
+  # ---- 第二轮补充：按 import_report.json 的 unmapped_top 频次排序补的常见食材 ----
+  - name: 大米
+    category: 主食
+    aliases: [粳米, 珍珠米, 东北大米]
+  - name: 猪油
+    category: 调料
+    aliases: [板油, 猪板油]
+  - name: 蒜苗
+    category: 蔬果
+    aliases: [青蒜, 蒜薹]
+  - name: 辣椒
+    category: 蔬果
+    aliases: [青辣椒, 红椒, 鲜辣椒, 尖椒]
+  - name: 姜黄粉
+    category: 调料
+    aliases: [姜黄]
+  - name: 豆豉
+    category: 调料
+    aliases: [豆豉酱]
+  - name: 陈皮
+    category: 调料
+    aliases: [橘皮, 干橘皮]
+  - name: 芝麻酱
+    category: 调料
+    aliases: [麻酱]
+  - name: 白芷
+    category: 调料
+    aliases: []
+  - name: 丁香
+    category: 调料
+    aliases: []
+  - name: 印度综合香料粉
+    category: 调料
+    aliases: [咖喱粉, 咖喱香料]
+  - name: 生菜
+    category: 蔬果
+    aliases: [球生菜, 罗马生菜]
+  - name: 青菜
+    category: 蔬果
+    aliases: [小青菜, 上海青, 小白菜]
+  - name: 金针菇
+    category: 蔬果
+    aliases: [金菇]
+  - name: 皮蛋
+    category: 蛋奶
+    aliases: [松花蛋, 变蛋]
+  - name: 酸奶
+    category: 蛋奶
+    aliases: [优格, 老酸奶]

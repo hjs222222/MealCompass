@@ -9,6 +9,7 @@ import textwrap
 
 import pytest
 
+from domain.ingredients import CanonicalIngredient, IngredientDictionary
 from scripts.import_howtocook import (
     Ingredient,
     parse_calories,
@@ -326,3 +327,24 @@ def test_recipe_without_images_has_empty_image_lists() -> None:
     recipe = parse_recipe_markdown(FIXTURE, source_path="meat_dish/葱烧鸡腿.md")
     assert recipe.images == []
     assert recipe.external_images == []
+
+
+# ---------------------------------------------------------- 食材归一化接入
+
+
+def test_parse_recipe_applies_ingredient_dictionary() -> None:
+    """导入时带上词典：每味食材要落标准名与分类；词典里没有的留 None，不猜。"""
+    dictionary = IngredientDictionary([CanonicalIngredient(name="生抽", category="调料", aliases=("酱油",))])
+
+    recipe = parse_recipe_markdown(FIXTURE, source_path="meat_dish/葱烧鸡腿.md", dictionary=dictionary)
+
+    by_name = {item.name: item for item in recipe.ingredients}
+    assert by_name["生抽"].canonical == "生抽"
+    assert by_name["生抽"].category == "调料"
+    assert by_name["盐"].canonical is None
+    assert by_name["盐"].category is None
+
+
+def test_parse_recipe_without_dictionary_leaves_canonical_empty() -> None:
+    recipe = parse_recipe_markdown(FIXTURE, source_path="meat_dish/葱烧鸡腿.md")
+    assert all(item.canonical is None for item in recipe.ingredients)

@@ -122,6 +122,7 @@ mealcompass/
 ├── data/
 │   ├── recipes/              # 原始菜谱 JSON
 │   ├── rules/                # 规则 YAML（可热更新）
+│   ├── ingredients/          # 食材归一化词典（别名 → 标准名，T1.3）
 │   └── eval/                 # 评估集
 │
 ├── docker-compose.yml
@@ -226,6 +227,7 @@ ingredient_aliases (
   alias VARCHAR,
   UNIQUE(alias)
 )
+-- 种子数据：data/ingredients/aliases.yaml（T1.3，别名 → 标准名 + 分类）
 
 -- 菜谱-食材关联
 recipe_ingredients (
@@ -406,6 +408,7 @@ class RerankClient(Protocol):
 | v0.2 | 2026-10-06 | 统一跨文档冲突（人群范围、profiles 归属、接口位置、会话存储、工期）；补充接口清单 | 消除与 PRD/TECH_STACK/CONVENTIONS 的歧义 |
 | v0.3 | 2026-10-06 | **取消医学人群细分**，规则改为通用约束（忌口/时间/厨具/口味）；新增 EmbeddingClient / RerankClient 接口（远程优先、本地兜底） | 医学营养数据不可得，避免不可验证的约束 |
 | v0.4 | 2026-10-06 | 菜谱模型新增 `images` / `external_images`；354 张配图随菜谱入库 | 网页端详情页需要成品图，纯文本 RAG 之外还要展示 |
+| v0.5 | 2026-10-06 | 新增 `data/ingredients/aliases.yaml` 归一化词典与 `domain/ingredients.py`；`Ingredient` 增加 `canonical` / `category` | 检索与忌口过滤需要把「西红柿/番茄」收敛到同一个标准名 |
 
 **迭代规则**：
 

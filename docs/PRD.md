@@ -153,7 +153,7 @@ UserProfile:
   - [ ] 数据源为 **HowToCook**（Unlicense / 公有领域）；`scripts/import_howtocook.py` 完成 Markdown → JSON schema 解析，`source` 字段可追溯
   - [ ] 配图随菜谱入库并可直接取用（177/372 道菜有图，共 346 张；无图菜谱用占位图）
   - [ ] 每条菜谱含完整 schema（见 1.2 节字段）
-  - [ ] 食材已归一化（番茄=西红柿）
+  - [ ] 食材已归一化（番茄=西红柿）：词典在 `data/ingredients/aliases.yaml`，导入时落 `canonical` / `category`；未收录的进 `import_report.json` 的 `unmapped_top` 待补
   - [ ] 热量字段缺失即标注「未知」，**不可编造**；不做蛋白质/GI/钠的数值推断
 
 #### F-B2 双层切分与索引 `[MVP]`
