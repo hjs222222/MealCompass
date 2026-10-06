@@ -36,6 +36,7 @@
 - [x] **D15 `reference/` 用途**：已定 —— 存放参考资料，**目前尚未开始收集**（目录已可写）
 - [x] **D16 营养数据缺口**：已定 —— **放弃人群细分**。HowToCook 只提供预估热量与难度，没有蛋白质/GI/钠，不足以支撑医学约束；改为只展示热量、把「少油少盐低卡」降级为软偏好（PRD 模块 D、F-D4）
 - [x] **D17 远程优先 / 本地兜底**：已定（**模型线**）—— Embedding（BGE-M3）与重排（bge-reranker-v2-m3）默认走 SiliconFlow / DeepSeek 等 OpenAI 兼容接口；本地兜底用 Ollama / sentence-transformers；两者都由 `domain/ports.py` 的 Protocol 约束，trace 标注 provider 与降级
+- [x] **D18 配图策略**：已定 —— **配图随仓库直接提交、保留原图**（108.7 MB，共 354 张），理由是网页端要展示成品图、原图观感更好；`.gitattributes` 已按二进制处理
 
 ---
 
@@ -58,6 +59,7 @@
 - [ ] **T0.3 补齐仓库根文件**：`LICENSE`(MIT)、`.gitignore`（含 `.idea/`）、`.env.example`（`README.md` 环境变量表全量）
 - [x] **T0.3a 密钥防泄漏**：`.gitignore`（含 `.env`、`langfuse.txt`、`.idea/`、`HowToCook/`）+ `.env`（真实密钥，已忽略）+ `.env.example` —— 已完成
 - [x] **T0.12 Langfuse 可观测接入**：`backend/core/config.py`、`backend/infra/observability.py`、`backend/scripts/trace_smoke.py`；已真实发送并**在 API 侧核验通过**（Observations API v2 读回 6 条观察）
+- [x] **T0.13 `AGENTS.md`**：所有 AI 工具的入口约束（阅读顺序 / 边界 / 收尾流程 / 汇报格式），已落地并被本会话加载
 - [ ] **T0.4 写 `.cursorrules`**：合并 `TECH_STACK §4`、`ARCHITECTURE §7`、`CONVENTIONS §9.3` 三份约束
 - [ ] **T0.5 后端工具链**：`pyproject.toml`（ruff `line-length=120`、`target py311`、`select=["E","F","I","UP","B","SIM"]`；pytest + coverage ≥ 70%）、`uv` 初始化
 - [ ] **T0.6 前端工具链**：`package.json`、`tsconfig.json`（strict）、Tailwind v4（CSS-first `@theme`，**不产 `tailwind.config.js`**）、`npx shadcn@latest init`
@@ -75,7 +77,8 @@
 
 ### 4.1 数据层
 - [ ] **T1.1 建核心表** `[MVP]`：`users` / `user_profiles` / `recipes` / `recipe_steps` / `ingredients` / `ingredient_aliases` / `recipe_ingredients` / `recipe_embeddings` / `conversations` / `messages` / `feedbacks` / `shopping_lists`（UUID 主键、JSONB、向量 1024）
-- [ ] **T1.2 HowToCook → JSON 入库脚本** `[MVP]`：`scripts/import_howtocook.py`。Markdown 结构映射：H1→菜名、首段→描述、`预估卡路里`→nutrition.calories、`预估烹饪难度`→difficulty、`## 必备原料和工具`→ingredients/tools、`## 计算`→每份用量、`## 操作`→steps、所在目录→category。**注意：HowToCook 无 time_minutes / protein / GI / sodium**（见 D16）
+- [x] **T1.2 HowToCook → JSON 入库脚本**：`scripts/import_howtocook.py`，372/372 解析成功、34→38 个单测全绿。三种用量语法（`名称 400 g` / `名称 = 2 斤` / `名称 15g*份数`）已覆盖；86 条上游没给数字的用量按「不编造」留原文
+- [x] **T1.2b 菜谱模型加 images 字段**：`Recipe.images`（数据集内相对路径，346 张，0 缺失）+ `Recipe.external_images`（2 条外链）；含括号文件名（`石凉粉(冰粉)成品1.jpg`）已正确处理
 - [ ] **T1.3 食材归一化** `[MVP]`：同义词表（番茄=西红柿），支持 LIKE + 全文检索
 - [ ] **T1.4 热量字段处理** `[MVP]`：缺失即标注「未知」，**不可编造**；不做蛋白质 / GI / 钠推断
 - [ ] **T1.5 索引** `[MVP]`：HNSW(`m=16, ef_construction=64`) + `gin(tsv)` + `recipes(time_minutes)` + `gin(tags)`

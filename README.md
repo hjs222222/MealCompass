@@ -71,7 +71,7 @@ MealCompass 是一个面向**所有做饭的普通人**的智能菜谱推荐 Age
 | **前端目录** | 不使用 `src/` 前缀：`app/`、`components/ui/`、`lib/` 直接放在 `frontend/` 下 |
 | **渲染策略** | 推荐 / 对话 / 购物清单 = CSR（client + TanStack Query）；落地页 / 菜谱详情 / legal = Server Component（SSR） |
 | **样式** | Natural Organic（`docs/UI_STYLE.md`）；Tailwind v4 CSS-first，token 定义在 `app/globals.css` 的 `@theme`，不生成 `tailwind.config.js`；shadcn/ui 主题必须映射到该调色板 |
-| **数据源** | 菜谱来自 HowToCook（Unlicense / 公有领域，可自由分发与商用）；上游仓库**不入库**（`.gitignore` 排除），本地保留工作副本 |
+| **数据源** | 菜谱来自 HowToCook（Unlicense / 公有领域，可自由分发与商用）。372 道菜谱 + 354 张成品配图已收录进 `data/raw/howtocook/` 并随仓库提交；上游完整 clone（623 MB）不入库 |
 | **模型调用** | **远程优先、本地兜底**：Embedding / Rerank 默认走 SiliconFlow、DeepSeek 等 OpenAI 兼容接口，失败或离线时回落 Ollama / sentence-transformers 本地推理；实现在 `infra/`，接口在 `domain/ports.py`，trace 里标注实际走的是哪条路 |
 | **会话存储** | `PostgresSaver` 是会话状态唯一事实源；Redis 只做缓存与限流 |
 | **规则** | YAML 文件（`data/rules/`），不入库，可版本控制 |

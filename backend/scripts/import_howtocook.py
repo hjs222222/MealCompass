@@ -1,4 +1,4 @@
-"""HowToCook Markdown → 结构化菜谱 JSON（任务 T1.2）。
+"""HowToCook Markdown → 结构化菜谱 JSON（任务 T1.2 / T1.2b）。
 
 输入：``data/raw/howtocook/<category>/<菜名>.md``（见 ``docs/DATA_SOURCES.md``）
 输出：``data/recipes/howtocook.json`` + ``data/recipes/import_report.json``
@@ -17,12 +17,14 @@
 3. ``time_minutes`` 上游不提供 → 恒为 ``None``（由规则层按难度兜底并标注不确定）。
 4. 厨具识别是启发式关键词表：命中即收敛到关键词本身；整句说明既不算食材也不算厨具，直接丢弃。
 5. 上游有两种目录布局：``分类/菜名.md`` 与 ``分类/菜名/菜名.md``，分类一律取**顶层目录**。
+6. 配图按原文件名保留，转成**数据集内相对路径**（前端详情页直接取用）；外链图单独存 ``external_images``。
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import posixpath
 import re
 import sys
 import uuid
@@ -61,6 +63,8 @@ SERVING_MULTIPLIER_RE = re.compile(r"\s*[*×xX]\s*份数\s*$")
 APPROX_PREFIX_RE = re.compile(r"^(?:约|大约|大概|差不多|近)\s*")
 APPROX_SUFFIX_RE = re.compile(r"\s*(?:约|大约|大概|差不多)$")
 PROSE_PUNCT_RE = re.compile(r"[，。！？；：]")
+# 图片语法：允许文件名里带一层括号（上游有 `石凉粉(冰粉)成品1.jpg`）
+IMAGE_RE = re.compile(r"!\[(?P<alt>[^\]]*)\]\((?P<url>[^()\s]*(?:\([^()]*\)[^()\s]*)*)\)")
 
 NUM = r"\d+(?:\.\d+)?"
 _UNITS = (
@@ -71,8 +75,20 @@ NUM_AMOUNT_RE = re.compile(
     rf"^(?P<min>{NUM})(?:\s*[-~—至]\s*(?P<max>{NUM}))?"
     rf"\s*(?P<size>[大小])?\s*(?P<unit>{_UNITS})?\s*(?P<tail>.*)$"
 )
-CN_NUM = {"一": 1.0, "二": 2.0, "两": 2.0, "三": 3.0, "四": 4.0, "五": 5.0,
-          "六": 6.0, "七": 7.0, "八": 8.0, "九": 9.0, "十": 10.0, "半": 0.5}
+CN_NUM = {
+    "一": 1.0,
+    "二": 2.0,
+    "两": 2.0,
+    "三": 3.0,
+    "四": 4.0,
+    "五": 5.0,
+    "六": 6.0,
+    "七": 7.0,
+    "八": 8.0,
+    "九": 9.0,
+    "十": 10.0,
+    "半": 0.5,
+}
 CN_AMOUNT_RE = re.compile(
     rf"^(?P<cn>[一二两三四五六七八九十半]+)\s*(?P<size>[大小])?\s*(?P<unit>{_UNITS})?\s*(?P<tail>.*)$"
 )
@@ -83,14 +99,82 @@ PROSE_MIN_LEN = 12
 
 # 启发式厨具关键词：宁可漏判（归为食材）也不要误伤食材名
 TOOL_KEYWORDS = (
-    "炒锅", "汤锅", "平底锅", "不粘锅", "奶锅", "砂锅", "铁锅", "高压锅", "压力锅", "电压力锅",
-    "蒸锅", "蒸屉", "蒸笼", "蒸架", "屉布", "电饭煲", "电炖锅", "空气炸锅", "电饼铛",
-    "烤箱", "烤炉", "微波炉", "电磁炉", "燃气灶", "灶台", "电水壶", "烧水壶", "热水壶",
-    "料理机", "破壁机", "豆浆机", "搅拌机", "绞肉机", "厨师机", "打蛋器", "面包机", "咖啡机",
-    "温度计", "厨房秤", "电子秤", "量杯", "量勺", "擀面杖", "案板", "砧板", "菜刀", "刀具",
-    "剪刀", "削皮刀", "刨丝器", "擦丝器", "漏勺", "漏网", "滤网", "筛子", "面粉筛", "锅铲",
-    "汤勺", "炒勺", "食品夹", "夹子", "筷子", "牙签", "竹签", "锡纸", "油纸", "烘焙纸",
-    "保鲜膜", "保鲜袋", "密封袋", "烤盘", "烤架", "烤网", "模具", "裱花袋", "棉线",
+    "炒锅",
+    "汤锅",
+    "平底锅",
+    "不粘锅",
+    "奶锅",
+    "砂锅",
+    "铁锅",
+    "高压锅",
+    "压力锅",
+    "电压力锅",
+    "蒸锅",
+    "蒸屉",
+    "蒸笼",
+    "蒸架",
+    "屉布",
+    "电饭煲",
+    "电炖锅",
+    "空气炸锅",
+    "电饼铛",
+    "烤箱",
+    "烤炉",
+    "微波炉",
+    "电磁炉",
+    "燃气灶",
+    "灶台",
+    "电水壶",
+    "烧水壶",
+    "热水壶",
+    "料理机",
+    "破壁机",
+    "豆浆机",
+    "搅拌机",
+    "绞肉机",
+    "厨师机",
+    "打蛋器",
+    "面包机",
+    "咖啡机",
+    "温度计",
+    "厨房秤",
+    "电子秤",
+    "量杯",
+    "量勺",
+    "擀面杖",
+    "案板",
+    "砧板",
+    "菜刀",
+    "刀具",
+    "剪刀",
+    "削皮刀",
+    "刨丝器",
+    "擦丝器",
+    "漏勺",
+    "漏网",
+    "滤网",
+    "筛子",
+    "面粉筛",
+    "锅铲",
+    "汤勺",
+    "炒勺",
+    "食品夹",
+    "夹子",
+    "筷子",
+    "牙签",
+    "竹签",
+    "锡纸",
+    "油纸",
+    "烘焙纸",
+    "保鲜膜",
+    "保鲜袋",
+    "密封袋",
+    "烤盘",
+    "烤架",
+    "烤网",
+    "模具",
+    "裱花袋",
+    "棉线",
 )
 
 
@@ -107,6 +191,34 @@ def parse_calories(text: str) -> int | None:
     """``预估卡路里：850 大卡`` → 850；没有则 None（绝不估算）。"""
     match = CALORIE_RE.search(text)
     return int(match.group(1)) if match else None
+
+
+# --------------------------------------------------------------------------- 配图
+
+
+def extract_images(text: str, source_path: str) -> tuple[list[str], list[str]]:
+    """抽取文中配图。
+
+    本地图转成**数据集内相对路径**（如 ``vegetable_dish/上汤娃娃菜/上汤娃娃菜.png``），
+    外链图（GitHub user-images 等）单独返回，保持原样不下载。
+    """
+    base = posixpath.dirname(source_path)
+    local: list[str] = []
+    external: list[str] = []
+
+    for match in IMAGE_RE.finditer(text):
+        url = match.group("url").strip().strip("<>")
+        if not url:
+            continue
+        if url.startswith(("http://", "https://")):
+            if url not in external:
+                external.append(url)
+            continue
+        resolved = posixpath.normpath(posixpath.join(base, url)) if base else posixpath.normpath(url)
+        if resolved not in local:
+            local.append(resolved)
+
+    return local, external
 
 
 # --------------------------------------------------------------------------- 用量解析
@@ -276,6 +388,8 @@ def _first_paragraph(text: str) -> str | None:
             continue
         if line.startswith(("预估烹饪难度", "预估卡路里")):
             continue
+        if IMAGE_RE.match(line):
+            continue
         return line
     return None
 
@@ -334,12 +448,13 @@ def parse_recipe_markdown(text: str, *, source_path: str) -> Recipe:
                 ingredients.setdefault(item.name, item)
 
     calories = parse_calories(text)
+    images, external_images = extract_images(text, source_path)
     return Recipe(
         id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"howtocook:{source_path}")),
         slug=f"{category}-{name}",
         name=name,
         category=category,
-        description=_first_paragraph(text[title_match.end():]),
+        description=_first_paragraph(text[title_match.end() :]),
         difficulty=parse_difficulty(text),
         calories_kcal=calories,
         calories_source=CALORIES_SOURCE if calories is not None else None,
@@ -348,6 +463,8 @@ def parse_recipe_markdown(text: str, *, source_path: str) -> Recipe:
         ingredients=list(ingredients.values()),
         tools=tools,
         steps=_steps(sections["操作"]),
+        images=images,
+        external_images=external_images,
         extra=(sections.get("附加内容", "").strip() or None),
         source=SOURCE_NAME,
         source_path=source_path,
@@ -362,9 +479,7 @@ def parse_recipe_markdown(text: str, *, source_path: str) -> Recipe:
 def iter_recipe_files(root: Path) -> list[Path]:
     """按分类目录收集菜谱 markdown（父目录以 ``.`` 开头的跳过）。"""
     return sorted(
-        path
-        for path in root.rglob("*.md")
-        if not any(part.startswith(".") for part in path.relative_to(root).parts)
+        path for path in root.rglob("*.md") if not any(part.startswith(".") for part in path.relative_to(root).parts)
     )
 
 
@@ -377,6 +492,7 @@ def import_all(root: Path, *, limit: int | None = None) -> tuple[list[Recipe], d
     recipes: list[Recipe] = []
     failures: list[dict[str, str]] = []
     unresolved: list[dict[str, str]] = []
+    missing_images: list[dict[str, str]] = []
     tool_candidates: Counter[str] = Counter()
 
     for path in files:
@@ -390,6 +506,9 @@ def import_all(root: Path, *, limit: int | None = None) -> tuple[list[Recipe], d
         for item in recipe.ingredients:
             if item.amount_min is None and item.amount_text:
                 unresolved.append({"path": source_path, "line": item.name, "amount_text": item.amount_text})
+        for image in recipe.images:
+            if not (root / image).exists():
+                missing_images.append({"path": source_path, "image": image})
         tool_candidates.update(recipe.tools)
 
     report = {
@@ -408,6 +527,11 @@ def import_all(root: Path, *, limit: int | None = None) -> tuple[list[Recipe], d
         "tools_unique": dict(sorted(tool_candidates.items(), key=lambda kv: (-kv[1], kv[0]))),
         "unresolved_amount_count": len(unresolved),
         "unresolved_amount_samples": unresolved[:20],
+        "recipes_with_images": sum(1 for r in recipes if r.images),
+        "images_total": sum(len(r.images) for r in recipes),
+        "external_images_total": sum(len(r.external_images) for r in recipes),
+        "missing_image_count": len(missing_images),
+        "missing_image_samples": missing_images[:20],
     }
     return recipes, report
 
@@ -442,6 +566,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  难度/热量  : {report['difficulty_coverage']} / {report['calories_coverage']} 有值")
     print(f"  食材       : {report['ingredients_total']} 条，去重 {report['ingredients_unique']} 种")
     print(f"  厨具识别   : {len(report['tools_unique'])} 种 -> {list(report['tools_unique'])[:12]}")
+    print(
+        f"  配图       : {report['recipes_with_images']} 道菜有图，共 {report['images_total']} 张"
+        f"（缺失 {report['missing_image_count']}，外链 {report['external_images_total']}）"
+    )
     print(f"  用量待确认 : {report['unresolved_amount_count']} 条")
     print(f"  输出       : {args.output}")
     print(f"  报告       : {args.report}")

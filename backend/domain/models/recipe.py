@@ -50,6 +50,14 @@ class Recipe(BaseModel):
     ingredients: list[Ingredient] = Field(default_factory=list)
     tools: list[str] = Field(default_factory=list)
     steps: list[str] = Field(default_factory=list)
+    images: list[str] = Field(
+        default_factory=list,
+        description="数据集内相对路径（相对 data/raw/howtocook），按文中出现顺序；首张可作封面",
+    )
+    external_images: list[str] = Field(
+        default_factory=list,
+        description="上游托管的外链图片（未下载到本地），前端可直接热链",
+    )
     extra: str | None = None
 
     source: str = "HowToCook"

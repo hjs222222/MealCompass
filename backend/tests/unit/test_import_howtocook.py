@@ -263,3 +263,66 @@ def test_ingredient_is_pydantic_model() -> None:
     """schema 要能被 Pydantic 校验，方便后续入库与 JSON 序列化。"""
     ing = Ingredient(name="盐")
     assert ing.model_dump()["name"] == "盐"
+
+
+# ---------------------------------------------------------------- 配图解析
+
+FIXTURE_WITH_IMAGES = textwrap.dedent(
+    """\
+    # 上汤娃娃菜的做法
+
+    清爽解腻的一道快手汤菜。
+
+    预估烹饪难度：★★
+    预估卡路里：120 大卡
+
+    ![成品图](./上汤娃娃菜.png)
+
+    ## 必备原料和工具
+
+    - 娃娃菜 1 颗
+    - 皮蛋 1 个
+    - 炒锅
+
+    ## 计算
+
+    一份够 2 个人吃。
+
+    - 娃娃菜 1 颗
+    - 皮蛋 1 个
+
+    ## 操作
+
+    1. 娃娃菜洗净切段。
+    2. 皮蛋切丁。
+    3. 上汤煮开后放入食材。
+
+    ## 附加内容
+
+    ![石凉粉(冰粉)成品1](./石凉粉(冰粉)成品1.jpg)
+    ![外链图](https://user-images.githubusercontent.com/1/a.jpg)
+    """
+)
+
+
+def test_recipe_images_are_dataset_relative() -> None:
+    recipe = parse_recipe_markdown(FIXTURE_WITH_IMAGES, source_path="vegetable_dish/上汤娃娃菜/上汤娃娃菜.md")
+    assert recipe.images[0] == "vegetable_dish/上汤娃娃菜/上汤娃娃菜.png"
+
+
+def test_recipe_images_handle_parentheses_in_filename() -> None:
+    """上游有 `石凉粉(冰粉)成品1.jpg` 这类带括号的文件名，不能被截断。"""
+    recipe = parse_recipe_markdown(FIXTURE_WITH_IMAGES, source_path="vegetable_dish/上汤娃娃菜/上汤娃娃菜.md")
+    assert "vegetable_dish/上汤娃娃菜/石凉粉(冰粉)成品1.jpg" in recipe.images
+
+
+def test_recipe_external_images_are_separated_from_local_ones() -> None:
+    recipe = parse_recipe_markdown(FIXTURE_WITH_IMAGES, source_path="vegetable_dish/上汤娃娃菜/上汤娃娃菜.md")
+    assert recipe.external_images == ["https://user-images.githubusercontent.com/1/a.jpg"]
+    assert all("http" not in path for path in recipe.images)
+
+
+def test_recipe_without_images_has_empty_image_lists() -> None:
+    recipe = parse_recipe_markdown(FIXTURE, source_path="meat_dish/葱烧鸡腿.md")
+    assert recipe.images == []
+    assert recipe.external_images == []

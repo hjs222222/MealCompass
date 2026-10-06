@@ -24,6 +24,8 @@ dev = [
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+# 沙箱会留下不可读的 pytest 临时目录，会让 ruff 扫描崩溃，直接排除
+extend-exclude = ["pytest-cache-files-*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

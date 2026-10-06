@@ -2,7 +2,6 @@
 .env
 .env.*
 !.env.example
-langfuse.txt
 
 # ===== Python =====
 __pycache__/

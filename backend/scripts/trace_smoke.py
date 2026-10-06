@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 import time
 from pathlib import Path
@@ -223,7 +222,9 @@ def main() -> int:
         usage = pick(row, "usage_details") or {}
         tokens = ""
         if usage:
-            tokens = f"{usage.get('input', usage.get('input_tokens', '-'))}/{usage.get('output', usage.get('output_tokens', '-'))}"
+            in_tokens = usage.get("input", usage.get("input_tokens", "-"))
+            out_tokens = usage.get("output", usage.get("output_tokens", "-"))
+            tokens = f"{in_tokens}/{out_tokens}"
         print(
             f"{str(pick(row, 'type')):<12}{str(pick(row, 'name')):<26}"
             f"{str(pick(row, 'model') or '-'):<16}{tokens:<14}{pick(row, 'latency')}"

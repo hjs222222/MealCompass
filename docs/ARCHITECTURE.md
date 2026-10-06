@@ -197,7 +197,8 @@ recipes (
   difficulty VARCHAR,
   tools JSONB,
   servings INT,
-  nutrition JSONB,             -- {"calories":320,"protein":18}
+  nutrition JSONB,             -- {"calories":320}（仅热量，HowToCook 预估）
+  images JSONB,                -- 配图相对路径数组，首张作封面；外链另存 external_images
   source VARCHAR,              -- 数据来源，合规用
   created_at TIMESTAMP
 )
@@ -404,6 +405,7 @@ class RerankClient(Protocol):
 | v0.1 | 2026-10-06 | 初始草案 | 建立基线 |
 | v0.2 | 2026-10-06 | 统一跨文档冲突（人群范围、profiles 归属、接口位置、会话存储、工期）；补充接口清单 | 消除与 PRD/TECH_STACK/CONVENTIONS 的歧义 |
 | v0.3 | 2026-10-06 | **取消医学人群细分**，规则改为通用约束（忌口/时间/厨具/口味）；新增 EmbeddingClient / RerankClient 接口（远程优先、本地兜底） | 医学营养数据不可得，避免不可验证的约束 |
+| v0.4 | 2026-10-06 | 菜谱模型新增 `images` / `external_images`；354 张配图随菜谱入库 | 网页端详情页需要成品图，纯文本 RAG 之外还要展示 |
 
 **迭代规则**：
 

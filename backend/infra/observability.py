@@ -28,8 +28,9 @@ from __future__ import annotations
 import importlib
 import logging
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from core.config import Settings, get_settings
 
@@ -92,10 +93,10 @@ class _NullObservation:
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def update(self, **_: Any) -> "_NullObservation":
+    def update(self, **_: Any) -> _NullObservation:
         return self
 
-    def end(self, **_: Any) -> "_NullObservation":
+    def end(self, **_: Any) -> _NullObservation:
         return self
 
     def score(self, *_: Any, **__: Any) -> None:
@@ -182,7 +183,7 @@ def attributes(**kwargs: Any) -> Iterator[None]:
     未启用 tracing 时为空操作。
     """
     if configure():
-        propagate_attributes = getattr(_module, "propagate_attributes")
+        propagate_attributes = _module.propagate_attributes
         with propagate_attributes(**kwargs):
             yield
     else:
