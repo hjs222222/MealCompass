@@ -3,6 +3,8 @@
 
 > 基于混合检索与 LangGraph Agent 的多约束菜谱规划助手
 > 根据你的食材、时间、厨具、健康画像，推荐今天吃什么/做什么，并生成步骤、替代食材与购物清单。
+>
+> **文档版本 v1.1（2026-10-06）**：已统一跨文档冲突，全局口径见下方「全局约定（唯一口径）」。
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green)](https://fastapi.tiangolo.com/)
@@ -27,10 +29,10 @@ MealCompass 是一个面向多人群的智能菜谱推荐 Agent。它不只是�
 
 | 模块         | 功能                                             | 状态   |
 | ------------ | ------------------------------------------------ | ------ |
-| 用户与画像   | 注册/登录、多人群画像、长期记忆                  | MVP    |
+| 用户与画像   | 邮箱 + JWT 登录、多人群画像（MVP）、长期记忆（P1） | MVP/P1 |
 | 知识库与 RAG | 200+ 结构化菜谱、混合检索、重排、引用防幻觉      | MVP    |
 | Agent 推荐   | 查询理解、澄清追问、3 道推荐、反思校验、工具调用 | MVP    |
-| 多人群约束   | 健身、糖尿病、儿童、高血压（可扩展）             | MVP    |
+| 多人群约束   | `general` / `fitness` / `diabetes`（MVP）；儿童、高血压（P1） | MVP/P1 |
 | 菜谱与烹饪   | 菜谱详情、份量缩放、食材替代、烹饪指导模式       | MVP/P1 |
 | 购物与规划   | 购物清单合并、一周菜单、食材库存                 | MVP/P1 |
 | 反馈与迭代   | 点赞/踩/收藏/做过、历史记录、评估看板            | MVP/P1 |
@@ -55,6 +57,28 @@ MealCompass 是一个面向多人群的智能菜谱推荐 Agent。它不只是�
 | **容器化**    | Docker + Docker Compose                           | —                      |
 
 > 完整技术栈清单与 AI 编码约束见 [`docs/TECH_STACK.md`](./docs/TECH_STACK.md)。
+
+## 🧭 全局约定（唯一口径）
+
+> 跨文档冲突已在本节统一。任何文档、代码或 AI 生成内容与此处不一致时，**以本节为准**。
+
+| 议题 | 统一结论 |
+| ---- | -------- |
+| **登录** | 邮箱 + 密码 + JWT（注册 / 登录 / 登出 / 刷新）；**不做第三方 OAuth** |
+| **MVP 人群** | `general` / `fitness` / `diabetes` 三人群；儿童、高血压为 P1；孕妇、痛风为 P2。过敏原规则属 MVP（作为全人群「忌口」硬约束） |
+| **画像归属** | `backend/domain/profiles/`（`domain` 是唯一无 IO 层） |
+| **接口定义** | 所有 Protocol 集中在 `domain/ports.py`（`RecipeRepository` / `Retriever` / `LLMClient`），实现在 `infra/`、`rag/` |
+| **前端目录** | 不使用 `src/` 前缀：`app/`、`components/ui/`、`lib/` 直接放在 `frontend/` 下 |
+| **渲染策略** | 推荐 / 对话 / 购物清单 = CSR（client + TanStack Query）；落地页 / 菜谱详情 / legal = Server Component（SSR） |
+| **样式** | Natural Organic（`docs/UI_STYLE.md`）；Tailwind v4 CSS-first，token 定义在 `app/globals.css` 的 `@theme`，不生成 `tailwind.config.js`；shadcn/ui 主题必须映射到该调色板 |
+| **会话存储** | `PostgresSaver` 是会话状态唯一事实源；Redis 只做缓存与限流 |
+| **规则** | YAML 文件（`data/rules/`），不入库，可版本控制 |
+| **可观测** | Langfuse + Sentry 属 MVP，但未配置 key 时自动降级为本地结构化日志 |
+| **评估** | `scripts/eval.py` 手动跑；稳定后再入 CI，MVP 阶段不进必跑流水线 |
+| **语音** | Web Speech API（客户端） |
+| **工期** | 总计 4-6 周（单人全职）：M1 1-1.5 周 / M2 1.5-2 周 / M3 1-1.5 周 / M4 0.5-1 周 |
+
+**文档地图**：`README.md`（本文件）· `docs/PRD.md` · `docs/TECH_STACK.md` · `docs/ARCHITECTURE.md` · `docs/CONVENTIONS.md` · `docs/UI_STYLE.md` · `docs/API.md`（自动生成）· `TODO.md`
 
 ## 🏗️ 架构概览
 
@@ -113,7 +137,7 @@ mealcompass/
 │   ├── recipes/              # 原始菜谱 JSON
 │   ├── rules/                # 规则 YAML（可热更新）
 │   └── eval/                 # 评估集
-├── docs/                     # PRD、技术栈、架构草案
+├── docs/                     # 文档（PRD / 技术栈 / 架构 / 规范 / UI 风格）
 ├── docker-compose.yml
 └── README.md
 ```
@@ -185,6 +209,7 @@ pnpm dev
 | `RERANKER_MODEL`      | 重排模型          | `BAAI/bge-reranker-v2-m3`                                   |
 | `LANGFUSE_PUBLIC_KEY` | Langfuse 公钥     | —                                                            |
 | `LANGFUSE_SECRET_KEY` | Langfuse 私钥     | —                                                            |
+| `SENTRY_DSN` | 异常上报（可选） | — |
 | `JWT_SECRET`          | JWT 密钥          | —                                                            |
 
 > 完整变量见 `.env.example`。
@@ -227,19 +252,24 @@ pnpm lint
 
 | 文档                                              | 说明                                   |
 | ------------------------------------------------- | -------------------------------------- |
-| [`docs/PRD.md`](./docs/PRD.md)                   | 产品需求文档（功能列表、验收标准）     |
-| [`docs/TECH_STACK.md`](./docs/TECH_STACK.md)     | 技术栈清单与 AI 编码约束               |
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | 轻量化架构草案（分层、模块、数据模型） |
-| [`docs/API.md`](./docs/API.md)                   | API 接口文档（自动生成）               |
+| [`docs/PRD.md`](./docs/PRD.md) | 产品需求文档（功能列表、验收标准） |
+| [`docs/TECH_STACK.md`](./docs/TECH_STACK.md) | 技术栈清单与 AI 编码约束 |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | 架构草案（分层、模块、数据模型） |
+| [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md) | 开发规范（分层 / 测试 / CI / Git） |
+| [`docs/UI_STYLE.md`](./docs/UI_STYLE.md) | 前端 UI 风格（Natural Organic） |
+| [`docs/API.md`](./docs/API.md) | API 文档（由 FastAPI OpenAPI 自动生成） |
+| [`TODO.md`](./TODO.md) | 待办与排期（决策项 / 里程碑 / 验收标准） |
 
 ## 🗺️ 路线图
 
 | 阶段 | 周期   | 交付                                         |
 | ---- | ------ | -------------------------------------------- |
-| M1   | 1-2 周 | 知识库 + 基础 RAG + 前后端骨架               |
-| M2   | 2-3 周 | 规则引擎 + 3 人群 + LangGraph Agent + 评估集 |
-| M3   | 1-2 周 | 购物清单 / 烹饪模式 / 部署 / Langfuse        |
-| M4   | 1 周   | README + 架构图 + Demo 视频 + 简历打磨       |
+| M1   | 1-1.5 周 | 知识库 + 基础 RAG + 前后端骨架 |
+| M2   | 1.5-2 周 | 规则引擎 + 3 人群（general/fitness/diabetes）+ LangGraph Agent + 评估集 |
+| M3   | 1-1.5 周 | 购物清单 / 烹饪模式 / 部署 / Langfuse |
+| M4   | 0.5-1 周 | README + 架构图 + Demo 视频 + 简历打磨 |
+
+> **总工期 4-6 周（单人全职）**：与 `TECH_STACK.md` 的选型前提一致。时间不足时优先砍 M3 的 P1 项，**评估与部署不可省**。
 
 ## 🤝 贡献指南
 

@@ -1,0 +1,250 @@
+# MealCompass 待办清单
+
+> 文档来源：`README.md`、`docs/PRD.md`、`docs/TECH_STACK.md`、`docs/ARCHITECTURE.md`、`docs/CONVENTIONS.md`、`docs/UI_STYLE.md`
+> 更新：2026-10-06 ｜ 状态：**跨文档冲突已全部统一**（结论见 §1 与 §9）
+> 标记：`[MVP]` 必须做 ｜ `[P1]` 时间允许必做 ｜ `[P2]` 写入「未来工作」
+
+---
+
+## 0. 怎么用这份清单
+
+- 文档间冲突已在 §1 定稿，并写入 `README.md` 的「全局约定（唯一口径）」——**以后所有文档、代码、AI 生成内容以那一节为准**。
+- 顺序原则（PRD §9）：**3 个人群做扎实 > 6 个人群半成品；评估与部署不可省，否则项目像玩具。**
+- 每个任务都标了来源文档，方便回头对验收标准（DoD）。
+
+---
+
+## 1. 已定决策（全部完成，直接执行）
+
+| # | 议题 | 结论 | 落点 |
+| --- | --- | --- | --- |
+| D1 | 规则热更新 | **YAML 文件**（`data/rules/`），量大再迁 DB | ARCHITECTURE §8 |
+| D2 | 会话存储 | **`PostgresSaver` 为唯一事实源**，Redis 只做缓存与限流 | CONVENTIONS §4.2 |
+| D3 | 前端渲染 | 推荐 / 对话 / 购物清单 **CSR**；落地页 / 菜谱详情 / legal **SSR** | CONVENTIONS §3.2 |
+| D4 | 评估触发 | **先手动**（`scripts/eval.py`），M2 稳定后再入 CI | CONVENTIONS §7.3 |
+| D5 | 语音 | **Web Speech API**（客户端，零成本） | PRD F-E3 |
+| D6 | 人群范围 | **MVP 三人群 = `general` / `fitness` / `diabetes`**；儿童、高血压 P1；孕妇、痛风 P2。过敏原规则属 MVP | PRD §1.3 / F-D3 |
+| D7 | 登录方式 | **邮箱 + 密码 + JWT**，不做第三方 OAuth | PRD §1.5 / F-A1 |
+| D8 | 画像归属 | **`backend/domain/profiles/`**（domain 是唯一无 IO 层） | TECH_STACK §2.2 |
+| D9 | 前端目录 | **不用 `src/`**：`app/`、`components/ui/`、`lib/` | CONVENTIONS §1.2 / §3.3 |
+| D10 | 文档命名与路径 | 规范名迁到 `docs/`，README 在根目录 | README 文档索引 |
+| D11 | 接口位置 | 所有 Protocol 集中 **`domain/ports.py`**，实现在 `infra/`、`rag/` | ARCHITECTURE §5 |
+| D12 | 工期 | **总计 4-6 周**：M1 1-1.5 / M2 1.5-2 / M3 1-1.5 / M4 0.5-1 周 | README 路线图 / PRD §9 |
+| D13 | 可观测优先级 | Langfuse + Sentry 属 **MVP**，未配置 key 时**自动降级为本地日志** | CONVENTIONS §8.2 / TECH_STACK §2.6 |
+
+- [ ] **D14 菜谱数据来源与许可**（仍未定）：HowToCook / Food.com 等具体选哪个、能否再分发、GI/钠数据出处怎么标注（PRD F-B1、F-D2、F-D4、F-H6）
+- [ ] **D15 `reference/` 目录用途**（仍未定）：仓库里这个目录是空的，明确放什么或删掉
+
+---
+
+## 2. 开工前准备（你要亲自做/申请的东西）
+
+- [ ] **P1 申请 LLM API Key**：DeepSeek（或任何 OpenAI 兼容），确定 `LLM_BASE_URL` / `LLM_MODEL`（`README.md` 环境变量表）
+- [ ] **P2 确定 Langfuse 形态**：自托管（docker）还是 Cloud，拿到 public/secret key（未配置也能开发，只是降级为本地日志）
+- [ ] **P3 确认机器资源**：bge-reranker-v2-m3 内存需求 ≥ 8GB；有 GPU 更好
+- [ ] **P4 解决模型下载**：BGE-M3 + reranker 走 ModelScope 镜像或 Ollama（TECH_STACK §6 避坑）
+- [ ] **P5 准备菜谱数据**：200+ 道结构化菜谱的来源、营养字段缺失率 ≤ 20%（PRD F-B1）
+- [ ] **P6 部署账号**：Vercel（前端）+ 云服务器（后端）+ 域名/HTTPS（PRD F-H5、§7）
+
+---
+
+## 3. 阶段 P0：仓库与工程基线（0.5-1 周，全部 [MVP]）
+
+- [x] ~~**T0.1 建目录骨架**~~（部分完成：`docs/` 已建，`backend/` `frontend/` `data/` 待建）
+- [x] **T0.2 文档落地并改名**：已完成 —— `docs/{PRD,TECH_STACK,ARCHITECTURE,CONVENTIONS,UI_STYLE}.md` + 根 `README.md`
+- [ ] **T0.2b 删除旧目录 `goal/`**：内容已完整迁到 `docs/`，`goal/` 是过期副本（**需要你在资源管理器/IDE 里删，沙箱不让我删这个目录**）
+- [ ] **T0.3 补齐仓库根文件**：`LICENSE`(MIT)、`.gitignore`（含 `.idea/`）、`.env.example`（`README.md` 环境变量表全量）
+- [ ] **T0.4 写 `.cursorrules`**：合并 `TECH_STACK §4`、`ARCHITECTURE §7`、`CONVENTIONS §9.3` 三份约束
+- [ ] **T0.5 后端工具链**：`pyproject.toml`（ruff `line-length=120`、`target py311`、`select=["E","F","I","UP","B","SIM"]`；pytest + coverage ≥ 70%）、`uv` 初始化
+- [ ] **T0.6 前端工具链**：`package.json`、`tsconfig.json`（strict）、Tailwind v4（CSS-first `@theme`，**不产 `tailwind.config.js`**）、`npx shadcn@latest init`
+- [ ] **T0.7 设计系统 token 落地**：把 `docs/UI_STYLE.md` 的自然有机风写进 `frontend/app/globals.css` 的 `@theme`（米色 `#faf6f1`、石棕 `#5c4033`、鼠尾草绿 `#8b9d77`、暖褐 `#d4a373`、`font-serif` 标题、`rounded-[2rem]` 卡片）
+- [ ] **T0.8 `docker-compose.yml`**：backend / frontend / `pgvector/pgvector:pg16` / `redis:7-alpine`
+- [ ] **T0.9 数据库迁移**：Alembic 初始化，每次迁移可回滚
+- [ ] **T0.10 CI**：`.github/workflows/ci.yml` → 后端 `ruff check . && ruff format --check . && pytest --cov=. --cov-fail-under=70`；前端 `pnpm typecheck && pnpm lint && pnpm build`
+- [ ] **T0.11 Git 流程**：`main`（只收 PR）/ `develop` / `feature/xxx` / `fix/xxx`；commit 用 `<type>: <description>`
+
+---
+
+## 4. 阶段 M1（1-1.5 周）：知识库 + 基础 RAG + 前后端骨架
+
+来源：`docs/PRD.md` 模块 B/E、`docs/ARCHITECTURE.md` §3、`docs/TECH_STACK.md` §2.1/2.3
+
+### 4.1 数据层
+- [ ] **T1.1 建核心表** `[MVP]`：`users` / `user_profiles` / `recipes` / `recipe_steps` / `ingredients` / `ingredient_aliases` / `recipe_ingredients` / `recipe_embeddings` / `conversations` / `messages` / `feedbacks` / `shopping_lists`（UUID 主键、JSONB、向量 1024）
+- [ ] **T1.2 菜谱 schema 与入库脚本** `[MVP]`：`scripts/seed_recipes.py`，≥ 200 道（PRD F-B1）
+- [ ] **T1.3 食材归一化** `[MVP]`：同义词表（番茄=西红柿），支持 LIKE + 全文检索
+- [ ] **T1.4 营养缺失标注** `[MVP]`：缺失率 ≤ 20%，缺失必须标注**不可编造**
+- [ ] **T1.5 索引** `[MVP]`：HNSW(`m=16, ef_construction=64`) + `gin(tsv)` + `recipes(time_minutes)` + `gin(tags)`
+
+### 4.2 RAG
+- [ ] **T1.6 双层切分** `[MVP]`：卡片级 + 步骤级分别索引；单条上下文 ≤ 模型窗口 60%（PRD F-B2）
+- [ ] **T1.7 Embedding 封装** `[MVP]`：BGE-M3，1024 维（`rag/embedding.py`）
+- [ ] **T1.8 混合检索** `[MVP]`：向量 Top50 + BM25(rank-bm25 + jieba) Top50 → RRF → Top10（PRD F-B3）
+- [ ] **T1.9 重排** `[MVP]`：bge-reranker-v2-m3，Top10 延迟 ≤ 500ms（PRD F-B4）
+- [ ] **T1.10 硬约束下推** `[MVP]`：时间/厨具/忌口下推到 SQL WHERE 或向量过滤，**禁止检索后再过滤**（PRD F-B5）
+- [ ] **T1.11 引用与防幻觉** `[MVP]`：每条推荐附真实 `recipe_id`；引用准确率 ≥ 95%（PRD F-B6）
+- [ ] **T1.12 建索引脚本** `[MVP]`：`scripts/build_index.py`
+- [ ] **T1.13 接口先行** `[MVP]`：在 `domain/ports.py` 定义 `RecipeRepository` / `Retriever` / `LLMClient`
+
+### 4.3 前后端骨架
+- [ ] **T1.14 FastAPI 入口与分层** `[MVP]`：`main.py` + `api/v1/*` 薄路由（≤10 行）+ `api/deps.py`；api 不直连 infra
+- [ ] **T1.15 配置外置** `[MVP]`：`core/config.py` 用 pydantic-settings 读 `.env`，dev/prod 分离
+- [ ] **T1.16 异常/日志** `[MVP]`：`core/exceptions.py`、`core/logging.py` 结构化日志
+- [ ] **T1.17 前端骨架** `[MVP]`：App Router + 路由组 `(auth)` / `(main)`，默认 Server Component
+- [ ] **T1.18 前端数据层** `[MVP]`：`lib/api.ts`、TanStack Query hooks、Zustand
+
+### 4.4 M1 验收
+- [ ] **A1.1** Recall@5 ≥ 85%，并给出「纯向量 vs 混合」消融对比（PRD F-B3）
+- [ ] **A1.2** 重排后 nDCG@5 相比未重排提升 ≥ 10%（PRD F-B4）
+
+---
+
+## 5. 阶段 M2（1.5-2 周）：规则引擎 + 人群 + LangGraph Agent + 评估集
+
+来源：`docs/PRD.md` 模块 C/D、`docs/CONVENTIONS.md` §4、`docs/ARCHITECTURE.md` §2
+
+### 5.1 规则引擎（domain 层，纯逻辑、零 IO）
+- [ ] **T2.1 `Rule` Protocol + 注册表** `[MVP]`：`domain/rules/{base,registry}.py`
+- [ ] **T2.2 规则 YAML 化** `[MVP]`：`data/rules/*.yaml`（hard_constraints 过滤 / soft_preferences 降权）
+- [ ] **T2.3 规则实现** `[MVP]`：allergen / glycemic / protein（MVP）+ sodium（P1）
+- [ ] **T2.4 规则优先级** `[MVP]`：冲突时 过敏 > 疾病 > 偏好（PRD §4.4）
+- [ ] **T2.5 无解放宽** `[MVP]`：硬约束无解 → 返回「无匹配 + 放宽建议」，**绝不返回违规菜谱**
+- [ ] **T2.6 规则单测** `[MVP]`：每条规则覆盖正反用例，覆盖率 ≥ 70%
+- [ ] **T2.7 新增人群零代码** `[MVP]`：加 1 个 profile + 1 个 rules YAML 即可
+
+### 5.2 人群（MVP 三人群）
+- [ ] **T2.8 general** `[MVP]`：无硬约束，口味/菜系软偏好
+- [ ] **T2.9 fitness** `[MVP]`：蛋白下限 + 热量区间；专项评估集 ≥ 20 条 query（PRD F-D1）
+- [ ] **T2.10 diabetes** `[MVP]`：GI / 碳水 / 糖上限；**缺失 GI 默认不推荐**（PRD F-D2）
+- [ ] **T2.11 child** `[P1]`：过敏原 + 年龄禁忌 +「亲子友好」排序（PRD F-D3）
+- [ ] **T2.12 hypertension** `[P1]`：钠上限 + 低盐替代（PRD F-D4）
+- [ ] **T2.13 画像路由** `[MVP]`：按画像自动选库/规则集，错误率 ≤ 5%（PRD F-D5）
+- [ ] **T2.14 画像 CRUD** `[MVP]`：引导可跳过（默认 general）、编辑立即生效（PRD F-A2）
+- [ ] **T2.15 注册/登录** `[MVP]`：**邮箱 + 密码 + JWT**（注册/登录/登出/刷新）、bcrypt、多用户数据隔离（PRD F-A1）
+
+### 5.3 LangGraph Agent
+- [ ] **T2.16 State 定义** `[MVP]`：TypedDict、扁平、累积字段用 reducer（CONVENTIONS §4.1）
+- [ ] **T2.17 七个节点** `[MVP]`：parse → clarify → search → filter → rank → reflect → output（PRD F-C6）
+- [ ] **T2.18 条件边** `[MVP]`：信息不足→澄清；检索为空→放宽；校验失败→重试
+- [ ] **T2.19 持久化** `[MVP]`：`PostgresSaver`，`thread_id` ≤ 255 字符，禁 `MemorySaver`
+- [ ] **T2.20 查询理解** `[MVP]`：Pydantic schema 校验，失败重试 ≤ 2 次，抽取准确率 ≥ 90%（PRD F-C1）
+- [ ] **T2.21 澄清追问** `[MVP]`：缺关键约束才追问，≤ 2 轮，可跳过（PRD F-C2）
+- [ ] **T2.22 推荐生成** `[MVP]`：固定 3 道，含理由/缺失食材/替代/耗时，JSON 可直接渲染（PRD F-C3）
+- [ ] **T2.23 反思校验** `[MVP]`：过敏原/时间/厨具/热量四类；重试 ≤ 2 次后降级（PRD F-C4）
+- [ ] **T2.24 工具注册表** `[MVP]`：5 个工具 + docstring + 超时兜底，新增工具 = 新文件 + 注册（CONVENTIONS §4.4）
+- [ ] **T2.25 温度与引用** `[MVP]`：温度 0.1，强制引用 `recipe_id`
+- [ ] **T2.26 多轮对话** `[P1]`：上下文 ≥ 10 轮、指代消解（PRD F-C7）
+
+### 5.4 菜谱与反馈
+- [ ] **T2.27 菜谱详情 + 份量缩放** `[MVP]`：1-8 人，服务端二次校验（PRD F-E1）
+- [ ] **T2.28 食材替代** `[MVP]`：≥ 30 组，标注口味/口感影响（PRD F-E2）
+- [ ] **T2.29 反馈四类** `[MVP]`：点赞/踩/收藏/做过，写入记忆（PRD F-G1）
+- [ ] **T2.30 历史记录** `[MVP]`：推荐 + 烹饪历史、短期不重复推荐（PRD F-G2）
+
+### 5.5 评估体系
+- [ ] **T2.31 标注评估集** `[MVP]`：100 条（PRD §8）
+- [ ] **T2.32 评估脚本** `[MVP]`：`scripts/eval.py`，Recall / nDCG / 约束满足 + 同步 Langfuse
+- [ ] **T2.33 RAGAS** `[MVP]`：Faithfulness / Answer Relevancy / Context Precision / Context Recall
+- [ ] **T2.34 消融实验** `[MVP]`：纯向量 / 混合 / +重排 / +反思 四组，结果写 README 与简历
+
+---
+
+## 6. 阶段 M3（1-1.5 周）：购物清单 / 烹饪模式 / 部署 / 可观测
+
+来源：`docs/PRD.md` 模块 F/G/H
+
+- [ ] **T3.1 购物清单** `[MVP]`：合并、按超市分区、勾选/删除/导出、单位统一（PRD F-F1）
+- [ ] **T3.2 烹饪指导模式** `[P1]`：大字分步 + 计时器 + Web Speech + Wake Lock（PRD F-E3）
+- [ ] **T3.3 一周菜单** `[P1]`：7 天 ±15%、食材复用率 ≥ 40%（PRD F-F2）
+- [ ] **T3.4 食材库存** `[P1]`：录入、临期优先（PRD F-F3）
+- [ ] **T3.5 限流与成本** `[MVP]`：20 次/小时、Redis 缓存、超时降级、单次 ≤ ¥0.05（PRD F-H4）
+- [ ] **T3.6 可观测** `[MVP]`：Langfuse 链路 + Sentry + 结构化日志（**key 缺失时优雅降级**）（PRD F-H3）
+- [ ] **T3.7 部署** `[MVP]`：Docker Compose 一键起、Vercel + 云服务器（PRD F-H5）
+- [ ] **T3.8 合规** `[MVP]`：免责声明、隐私政策、数据导出/删除、来源标注（PRD F-H6）
+- [ ] **T3.9 页面清单全部落地** `[MVP]`：`/` `/login` `/register` `/onboarding` `/recommend` `/chat` `/recipe/[id]` `/shopping` `/history` `/profile` `/legal`（PRD §5）
+- [ ] **T3.10 评估看板** `[P1]`（PRD F-G3）
+- [ ] **T3.11 长期记忆** `[P1]`（PRD F-A3）
+- [ ] **T3.12 图片识别 / T3.13 成本估算 / T3.14 A/B 实验** `[P2]` → 写入 README「未来工作」
+
+---
+
+## 7. 阶段 M4（0.5-1 周）：交付打磨
+
+- [ ] **T4.1 README 定稿**：启动命令、架构图、消融结果、Demo 视频、指标表
+- [ ] **T4.2 架构图**：分层依赖 + RAG 管线 + Agent 状态机
+- [ ] **T4.3 Demo 视频**：首次推荐 → 菜谱详情 → 烹饪模式 → 购物清单
+- [ ] **T4.4 `docs/API.md`**：由 FastAPI OpenAPI 导出
+- [ ] **T4.5 性能压测** `[MVP]`：P95 ≤ 3s，Locust 100 并发
+- [ ] **T4.6 安全** `[MVP]`：JWT、HTTPS、SQL 注入防护、安全扫描
+- [ ] **T4.7 简历打磨**：RAG 牌 / Agent 牌 / 工程牌
+- [ ] **T4.8 文档迭代日志**：`ARCHITECTURE §6`、`CONVENTIONS §10` 每次变更登记
+
+---
+
+## 8. 全程通用 DoD（每个任务都适用）
+
+- [ ] 后端：`ruff check . && ruff format --check .` 通过；类型注解完整；IO 全 `async`
+- [ ] 后端：`pytest` 覆盖率 ≥ 70%，单测不碰真实 DB
+- [ ] 后端：分层单向 `api → services → domain/agents/rag → infra`；`domain` 零 IO；路由 ≤ 10 行
+- [ ] 数据：UUID 主键、`TIMESTAMP WITH TIME ZONE`、JSONB、向量 1024、HNSW
+- [ ] 前端：`pnpm typecheck && pnpm lint && pnpm build` 通过；禁 `any`、禁 `@ts-ignore`
+- [ ] 前端：服务端状态用 TanStack Query，客户端状态用 Zustand，两者不混
+- [ ] 页面：响应式、加载/空/错误态齐全、关键操作二次确认、无控制台报错、Lighthouse ≥ 80
+- [ ] UI：严格套 `docs/UI_STYLE.md` 的 Natural Organic token
+- [ ] UI 禁止项：无 `bg-blue-*` / `bg-purple-*` / `bg-cyan-*` / `text-black` / `rounded-none` / `rounded-sm` / `shadow-lg|xl` / `bg-gradient-to-r`；无纯黑、无冷色主色、无玻璃态、无嵌套卡片、动效带 `prefers-reduced-motion`
+- [ ] 工程：不引入技术栈清单外的依赖；换 LLM 供应商 ≤ 1 天；新功能 ≤ 3 文件改动
+- [ ] 提交：功能分支 + `<type>: <description>`，PR 前 pytest/ruff 全绿
+
+---
+
+## 9. 冲突处理记录（已全部统一）
+
+| # | 原冲突 | 统一结论 | 改动落点 |
+| --- | --- | --- | --- |
+| ① | 儿童人群 P1 vs `[MVP]`；M2 只说「3 人群」 | MVP = general/fitness/diabetes；儿童 → P1；过敏原规则仍在 MVP | PRD §1.3 / F-D3 / §9；README 功能表与路线图 |
+| ② | `profiles/` 层级位置不一致 | 统一到 `domain/profiles/` | TECH_STACK §2.2/§4；PRD F-H1/§6；ARCHITECTURE §1/§2/§7 |
+| ③ | 前端 `src/` 前缀不一致 | 统一「不用 `src/`」 | CONVENTIONS §1.2/§3.3/§9.3；TECH_STACK §2.5 |
+| ④ | README 引用不存在的 `docs/*.md`；`ARCH.md` 名实不符 | 文档按规范名迁到 `docs/`，`ARCH.md` → `TECH_STACK.md` | 全部文件已迁移 |
+| ⑤ | Langfuse 标 P1 却又是 MVP | 按 MVP，但 key 缺失时降级为本地日志 | CONVENTIONS §8.2；TECH_STACK §2.6；README 全局约定 |
+| ⑥ | 工期 5-8 周 vs 4-6 周 | 统一 4-6 周并配平里程碑 | README 路线图；PRD §9 |
+| ⑦ | 规范内部 `src/components/ui/` 与 `components/ui/` 并存 | 统一 `components/ui/` | CONVENTIONS §3.3 |
+| ⑧ | 环境变量清单两处不一致（缺 model / Sentry） | 以 README 表为准，CONVENTIONS 补齐并标注可留空 | CONVENTIONS §8.2；README 环境变量表 |
+| ⑨ | UI 文档内部「禁止完美圆形」vs「按钮必须 `rounded-full`」 | 明确 pill 形状是允许的例外 | UI_STYLE 配套实现约定 |
+| ⑩ | 字体自检禁用 Inter/Roboto/Geist，但 Next 默认就用 | 指定 `font-serif`（Noto Serif SC）+ 系统/Noto Sans SC 正文栈 | UI_STYLE 配套实现约定 |
+
+---
+
+## 10. 风险与范围控制
+
+| 风险 | 应对 |
+| --- | --- |
+| 数据版权 | 只用开源/授权数据，标注来源 |
+| 健康合规 | 免责声明 + 非医疗建议 + 数据可删 |
+| LLM 幻觉 | 引用强制 + 规则校验 + 反思重试 |
+| 范围膨胀 | 严格按 MVP/P1/P2 分级 |
+| 成本失控 | 限流 + 缓存 + 降级 |
+| 时间不足 | 优先保 MVP，P1 可延后 |
+
+**范围红线**：3 个人群做扎实 > 6 个人群半成品；P1 只挑 2-3 个做深；P2 全部写「未来工作」。
+
+---
+
+## 11. 建议的第一批动作
+
+1. **T0.2b**：删掉 `goal/` 旧目录（我这边沙箱不允许删除该目录）。
+2. **T0.3-T0.7**：根文件 + `.cursorrules` + 前后端工具链 + 设计 token（1-2 天）。
+3. **T0.8/T0.9**：起 `docker-compose`（PG + pgvector + Redis），Alembic 建第一版表（1 天）。
+4. **最小闭环**：一条菜谱入库 → 建向量 → 检索返回，证明管线通（1-2 天）。
+5. 然后才进入 M1 的规模化（200 道 + 混合检索 + 重排）。
+
+> 依据：M1 的验收全部挂在检索质量（Recall@5 ≥ 85%）上，**检索管线早跑通比多写页面重要**。
+
+---
+
+## 附：本次统一的操作记录
+
+- 文档迁移：`goal/{PRD.md, 技术栈.md, 架构草案.md, 规范.md, website.md, PROJECT.md}` → `docs/{PRD,TECH_STACK,ARCHITECTURE,CONVENTIONS,UI_STYLE}.md` + 根 `README.md`（内容全部保留并统一修改）。
+- 权限修复（Windows 文件权限挡住沙箱读写）：
+  - `D:\Allcode\MealCompass` 与 `D:\Allcode\MealCompass\goal` 各补了一条当前用户的完全控制权限；备份与回滚脚本在 `D:\Allcode\acl-recovery\`。
+  - `goal/` 目录虽已修好权限，但沙箱进程仍无法在其中写入/删除，故采用「复制到 `docs/` 后由你删旧目录」的方式。
+- 版本：`README.md` / `PRD` / `TECH_STACK` 标 v1.1；`ARCHITECTURE` 标 v0.2；`CONVENTIONS` 迭代日志加 v1.1 行。

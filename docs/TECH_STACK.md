@@ -1,9 +1,10 @@
 
-# MealCompass 技术栈清单（v1.0）
+# MealCompass 技术栈清单（v1.1）
 
 > **用途**：喂给 AI Coding 工具（Cursor / Copilot / Claude 等），作为项目开发的技术边界约束。
 > **选型原则**：成熟优先、社区资料丰富、AI 训练数据覆盖度高、本科生可在 4-6 周内独立完成。
 > **阅读说明**：✅ 表示 AI 训练数据覆盖充分；⚠️ 表示资料中等，需注意版本兼容。
+> **变更 v1.1（2026-10-06）**：统一跨文档冲突（分层目录、接口位置、前端目录、可观测降级），全局口径见 [`../README.md`](../README.md) 的「全局约定（唯一口径）」。
 
 ## 一、技术栈总览
 
@@ -73,19 +74,21 @@ Edges: 条件路由（信息不足→澄清，检索为空→放宽约束，校�
 
 ```
 backend/
-  api/          # 路由 + DTO，仅参数校验
-  services/     # 业务编排，事务边界
-  domain/       # 实体、值对象、规则引擎（纯逻辑）
-  agents/       # LangGraph 节点、工具、状态
-  rag/          # 检索、重排、切分、索引
-  profiles/     # 人群画像模块
-  infra/        # DB、LLM 客户端、Redis
-  core/         # 配置、依赖注入、日志
+  api/            # 路由 + DTO，仅参数校验
+  services/       # 业务编排，事务边界
+  domain/         # 实体、值对象、规则引擎、人群画像（纯逻辑，唯一无 IO 层）
+    ports.py      # 所有 Protocol 接口（RecipeRepository / Retriever / LLMClient）
+    rules/        # 规则引擎
+    profiles/     # 人群画像（general / fitness / diabetes 为 MVP）
+  agents/         # LangGraph 节点、工具、状态
+  rag/            # 检索、重排、切分、索引（实现 domain.ports.Retriever）
+  infra/          # DB、LLM 客户端、Redis（实现 domain.ports.*）
+  core/           # 配置、依赖注入、日志、异常
 ```
 
 **关键约束**：
 
-- 抽象接口先行：`RecipeRepository`、`Retriever`、`LLMClient` 先定义 Protocol，再写实现
+- 抽象接口先行：`RecipeRepository`、`Retriever`、`LLMClient` 统一在 `domain/ports.py` 用 Protocol 定义，实现在 `infra/`、`rag/`
 - 换 LLM 供应商 ≤ 1 天工作量（通过 OpenAI 兼容接口）
 - 配置外置：`pydantic-settings` 读 `.env`，dev/prod 分离
 
@@ -147,6 +150,8 @@ backend/
 - 服务端状态用 TanStack Query，客户端状态用 Zustand
 - UI 组件从 shadcn/ui 复制到项目，不引入组件库依赖
 - 响应式设计，移动端可用
+- 目录不带 `src/` 前缀：`app/`、`components/ui/`、`lib/`
+- Tailwind v4 用 CSS-first：token 定义在 `app/globals.css` 的 `@theme`，不生成 `tailwind.config.js`
 
 **备选方案**：如果团队更熟悉 Vue，可替换为 Vue 3 + Nuxt 3 + Element Plus，学习曲线更平缓，但 AI 训练数据覆盖度低于 React。
 
@@ -154,7 +159,7 @@ backend/
 
 **Langfuse + RAGAS** ✅
 
-Langfuse 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token），RAGAS 用于自动化评估（Faithfulness / Answer Relevancy / Context Precision / Context Recall）。两者配合使用，Langfuse 做可观测，RAGAS 做量化评估。
+Langfuse 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token），RAGAS 用于自动化评估（Faithfulness / Answer Relevancy / Context Precision / Context Recall）。两者配合使用，Langfuse 做可观测，RAGAS 做量化评估。未配置 Langfuse key 时自动降级为本地结构化日志，不阻塞本地开发。
 
 **评估指标约束**：
 
@@ -187,12 +192,12 @@ Langfuse 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token），R
 - 数据库: PostgreSQL 16 + pgvector 0.7
 - Embedding: BGE-M3 (BAAI/bge-m3), 1024维
 - 重排: bge-reranker-v2-m3
-- 前端: Next.js 14 App Router + TypeScript + Tailwind v4 + shadcn/ui
+- 前端: Next.js 14 App Router + TypeScript + Tailwind v4 + shadcn/ui（目录不带 src/）
 - 状态: TanStack Query (服务端) + Zustand (客户端)
 - LLM: OpenAI 兼容接口，通过 LLMClient 抽象层调用
 
 # 架构约束
-- 分层: api / services / domain / agents / rag / profiles / infra / core
+- 分层: api → services → domain / agents / rag → infra（画像在 domain/profiles/，接口在 domain/ports.py）
 - 抽象接口先行: RecipeRepository / Retriever / LLMClient 用 Protocol 定义
 - 硬约束用规则引擎判定，LLM 不参与
 - 检索: 向量 + BM25 混合，RRF 融合，bge-reranker 重排

@@ -1,8 +1,9 @@
 **MealCompass 产品需求文档（PRD）**
 
-> 版本：v1.0
+> 版本：v1.1
 > 定位：基于混合检索与 LangGraph Agent 的多约束菜谱规划助手
-> 目标：本科实习项目 / Agent 工程师岗位作品集
+> 目标：本科实习项目 / Agent 工程师作品集
+> 变更（2026-10-06）：统一跨文档冲突（人群范围、登录方式、目录归属、接口位置、工期），全局口径见 [`../README.md`](../README.md) 的「全局约定（唯一口径）」
 
 ---
 
@@ -16,6 +17,7 @@
 - `[P1]` 显著提升竞争力，时间允许必做
 - `[P2]` 加分项，写入"未来工作"，不阻塞交付
 - 每个功能必须满足其全部 DoD 才算"完成"
+- 全局口径（人群范围、登录方式、目录归属、接口位置、工期）以根目录 [`README.md`](../README.md) 的「全局约定（唯一口径）」为准
 
 ---
 
@@ -46,6 +48,8 @@ MealCompass 根据用户的**食材库存、时间、厨具、健康画像、忌
 | 孕妇            | 禁忌食材、叶酸铁   | P2     |
 | 痛风人群        | 低嘌呤             | P2     |
 
+> MVP 人群 = `general`（普通家庭）/ `fitness` / `diabetes`；儿童、高血压为 P1，孕妇、痛风为 P2。过敏原规则属 MVP（全人群「忌口」硬约束）。
+
 ### 1.4 产品目标与成功指标
 
 | 目标     | 指标                    | 目标值    |
@@ -62,6 +66,7 @@ MealCompass 根据用户的**食材库存、时间、厨具、健康画像、忌
 - ❌ 不做医疗诊断或治疗建议
 - ❌ 不做外卖/电商下单
 - ❌ 不做 UGC 菜谱社区
+- ❌ 不做第三方登录（OAuth），MVP 仅邮箱 + JWT
 - ❌ 不做多智能体复杂协作（单主 Agent 足够）
 - ❌ 不做移动端原生 App（只做响应式 Web）
 - ❌ 不做实时视频烹饪教学
@@ -113,7 +118,7 @@ UserProfile:
 
 #### F-A1 注册 / 登录 `[MVP]`
 
-- 描述：邮箱或第三方登录，JWT 鉴权
+- 描述：邮箱 + 密码注册/登录，JWT 鉴权（**不做第三方 OAuth**）
 - **DoD：**
   - [ ] 支持注册、登录、登出、Token 刷新
   - [ ] 密码加密存储（bcrypt）
@@ -268,7 +273,9 @@ UserProfile:
   - [ ] GI 数据来源可追溯（标注出处）
   - [ ] 缺失 GI 的菜谱默认不推荐给该人群
 
-#### F-D3 儿童 `[MVP]`
+#### F-D3 儿童 `[P1]`
+
+> 过敏原规则本身属 MVP 范围（作为全人群「忌口」硬约束）；此处的 P1 仅指儿童专项画像与「亲子友好」排序。
 
 - **DoD：**
   - [ ] 支持过敏原、年龄禁忌过滤
@@ -394,7 +401,7 @@ UserProfile:
 #### F-H1 分层架构 `[MVP]`
 
 - **DoD：**
-  - [ ] 目录分层：api / services / domain / agents / rag / profiles / infra / core
+  - [ ] 目录分层：api / services / domain / agents / rag / infra / core（人群画像在 `domain/profiles/`，接口协议在 `domain/ports.py`）
   - [ ] 依赖注入，LLM/向量库/DB 可替换
   - [ ] 换向量库只改 infra 一层
 
@@ -510,7 +517,7 @@ UserProfile:
 | 层        | 选型                                   | 约束                                  |
 | --------- | -------------------------------------- | ------------------------------------- |
 | 前端      | Next.js 14 + TS + Tailwind + shadcn/ui | 组件化，状态用 Zustand/TanStack Query |
-| 后端      | FastAPI + Pydantic v2                  | 类型安全，自动文档                    |
+| 后端      | FastAPI + Pydantic v2 | 类型安全，自动文档；分层 api → services → domain/agents/rag → infra（画像在 domain/profiles/，接口在 domain/ports.py） |
 | 数据库    | Postgres + pgvector                    | 关系+向量+全文一体                    |
 | 缓存      | Redis                                  | 会话、限流、热点                      |
 | Agent     | LangGraph                              | 状态机，节点可注册                    |
@@ -522,7 +529,7 @@ UserProfile:
 **架构 DoD：**
 
 - [ ] 模块化单体，非微服务
-- [ ] 抽象接口先行（RecipeRepository / Retriever / LLMClient）
+  - [ ] 抽象接口先行（RecipeRepository / Retriever / LLMClient，统一在 `domain/ports.py` 定义 Protocol，`infra/` `rag/` 提供实现）
 - [ ] 单测覆盖率 ≥ 70%
 - [ ] 换 LLM 供应商 ≤ 1 天工作量
 
@@ -564,10 +571,12 @@ UserProfile:
 
 | 阶段 | 周期   | 交付                                         |
 | ---- | ------ | -------------------------------------------- |
-| M1   | 1-2 周 | 知识库 + 基础 RAG + 前后端骨架               |
-| M2   | 2-3 周 | 规则引擎 + 3 人群 + LangGraph Agent + 评估集 |
-| M3   | 1-2 周 | 购物清单 / 烹饪模式 / 部署 / Langfuse        |
-| M4   | 1 周   | README + 架构图 + Demo 视频 + 简历打磨       |
+| M1   | 1-1.5 周 | 知识库 + 基础 RAG + 前后端骨架 |
+| M2   | 1.5-2 周 | 规则引擎 + 3 人群（general/fitness/diabetes）+ LangGraph Agent + 评估集 |
+| M3   | 1-1.5 周 | 购物清单 / 烹饪模式 / 部署 / Langfuse |
+| M4   | 0.5-1 周 | README + 架构图 + Demo 视频 + 简历打磨 |
+
+> **总工期 4-6 周（单人全职）**：时间不足时优先砍 M3 的 P1 项，**评估与部署不可省**（否则项目像玩具）。
 
 **范围控制原则：**
 

@@ -12,7 +12,10 @@ MealCompass 开发规范与参考资料
 backend/
   api/          # 路由层：只做参数校验 + 调用 service，不写业务逻辑
   services/     # 业务编排：事务边界，组合 domain + infra
-  domain/       # 领域层：纯逻辑，无 IO，可单测（规则引擎、画像、实体）
+  domain/       # 领域层：纯逻辑，无 IO，可单测
+    ports.py    # 所有 Protocol 接口（RecipeRepository / Retriever / LLMClient）
+    rules/      # 规则引擎
+    profiles/   # 人群画像（general / fitness / diabetes 为 MVP）
   agents/       # Agent 层：LangGraph 节点、工具、状态定义
   rag/          # RAG 层：检索、重排、切分、索引
   infra/        # 基础设施：DB、LLM 客户端、Redis、观测
@@ -26,6 +29,7 @@ backend/
 **规则**：
 
 - ✅ 按业务领域组织代码，不按文件类型组织
+- ✅ 人群画像放 `domain/profiles/`，跨层接口 Protocol 放 `domain/ports.py`
 - ❌ `api` 层不直接调 `infra`，必须经 `services`
 - ❌ `domain` 层不做 IO（不导入 DB、HTTP 客户端）
 - ❌ 同层模块不互相调用，通过 `services` 编排
@@ -51,6 +55,7 @@ frontend/
 - 使用 App Router，不使用 Pages Router
 - 默认使用 React Server Components，仅在需要交互时加 `"use client"`
 - shadcn/ui 组件统一放在 `components/ui/`
+- 不使用 `src/` 前缀（`app/`、`components/`、`lib/` 直接放在 `frontend/` 下）
 
 ## 二、后端开发规范
 
@@ -177,10 +182,12 @@ ignore = []
 - 默认 Server Component，仅在需要 `useState`/`useEffect`/事件处理时加 `"use client"`
 - 数据获取用 Server Component 的 `async/await`，客户端用 TanStack Query
 - 不在 `layout.tsx` 中加 `"use client"`
+- 渲染策略：推荐 / 对话 / 购物清单等交互页用客户端组件（CSR + TanStack Query）；落地页、菜谱详情、legal 用 Server Component（SSR）
 
 ### 3.3 shadcn/ui
 
-- 组件统一放在 `src/components/ui/`
+- 组件统一放在 `components/ui/`
+- shadcn/ui 主题变量必须映射到 `docs/UI_STYLE.md` 的 Natural Organic token，禁止保留默认 slate/zinc 冷色主题
 - 使用语义化 variant，不直接改样式：`<Button variant="destructive">`
 - 保留 Radix UI 的可访问性属性（`aria-*`、`role`）
 - 使用 `cn()` 合并 className
@@ -194,6 +201,12 @@ ignore = []
 | 表单状态   | React Hook Form + Zod | 表单校验              |
 
 **规则**：服务端数据不放入 Zustand，Zustand 不存 API 响应缓存。
+
+### 3.5 Tailwind v4（CSS-first）
+
+- 设计 token 在 `app/globals.css` 用 `@theme` 定义，**不生成 `tailwind.config.js`**
+- 颜色 / 圆角 / 字体一律走 token（见 `docs/UI_STYLE.md`），不写裸色值
+- 禁止类：`bg-blue-*` / `bg-purple-*` / `bg-cyan-*` / `text-black` / `rounded-none` / `rounded-sm` / `shadow-lg|xl` / `bg-gradient-to-r`
 
 ## 四、AI / Agent 开发规范
 
@@ -231,6 +244,7 @@ graph = builder.compile(checkpointer=checkpointer)
 - **Store**：长期记忆，跨线程用户偏好
 - `thread_id` 保持在 255 字符以内
 - 生产环境使用 `PostgresSaver`，禁止 `MemorySaver`
+- Redis 只做缓存与限流，**不作为会话状态的事实源**（事实源是 `PostgresSaver`）
 
 ### 4.3 RAG 规范
 
@@ -391,6 +405,8 @@ jobs:
       - pnpm build
 ```
 
+> 离线评估（`scripts/eval.py`）在 MVP 阶段**不进入必跑 CI**；M2 评估集稳定后可加 nightly 任务。
+
 ## 八、环境与部署规范
 
 ### 8.1 Docker Compose 服务
@@ -425,9 +441,13 @@ services:
 | `REDIS_URL`           | ✅   | Redis 连接串      |
 | `LLM_API_KEY`         | ✅   | LLM API Key       |
 | `LLM_BASE_URL`        | ✅   | 兼容接口地址      |
+| `LLM_MODEL`           | ✅   | 模型名（deepseek-chat） |
+| `EMBEDDING_MODEL`     | ✅   | BAAI/bge-m3       |
+| `RERANKER_MODEL`      | ✅   | bge-reranker-v2-m3 |
 | `JWT_SECRET`          | ✅   | JWT 密钥          |
-| `LANGFUSE_PUBLIC_KEY` | P1   | 可观测            |
-| `LANGFUSE_SECRET_KEY` | P1   | 可观测            |
+| `LANGFUSE_PUBLIC_KEY` | ✅   | 可观测（可留空，留空即降级为本地日志） |
+| `LANGFUSE_SECRET_KEY` | ✅   | 可观测（可留空，留空即降级为本地日志） |
+| `SENTRY_DSN`          | P1   | 异常上报（可留空） |
 
 ## 九、参考资料
 
@@ -469,8 +489,9 @@ services:
 
 # 架构
 - 分层: api → services → domain/agents/rag → infra (单向)
+- 人群画像放 domain/profiles/，接口 Protocol 放 domain/ports.py
 - domain 层不做 IO, api 层不写业务逻辑
-- shadcn/ui 组件必须放在 src/components/ui/
+- shadcn/ui 组件必须放在 components/ui/（项目不用 src/ 前缀）
 
 # 数据
 - Pydantic v2: model_dump() 不用 .dict(), ConfigDict 配置
@@ -497,6 +518,7 @@ services:
 | 版本 | 日期       | 变更     | 原因             |
 | ---- | ---------- | -------- | ---------------- |
 | v1.0 | 2026-10-06 | 初始版本 | 建立开发规范基线 |
+| v1.1 | 2026-10-06 | 统一跨文档冲突；补充渲染策略、Tailwind v4、会话存储、环境变量清单 | 与 README、ARCHITECTURE、TECH_STACK 对齐，消除歧义 |
 
 **迭代规则**：
 

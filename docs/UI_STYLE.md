@@ -5,6 +5,16 @@ style_name: 自然有机风
 style_slug: natural-organic
 style_source: /styles/natural-organic
 
+## 配套实现约定（与 `CONVENTIONS.md` 一致）
+
+- 设计 token 落在 `frontend/app/globals.css` 的 `@theme`（Tailwind v4 CSS-first），**不生成 `tailwind.config.js`**。
+- shadcn/ui 主题变量必须映射到本文档调色板（背景 `#faf6f1`、主色 `#5c4033`、强调 `#8b9d77`、辅助 `#d4a373`），**禁止保留默认 slate/zinc 冷色主题**。
+- 组件统一放 `frontend/components/ui/`（项目不使用 `src/` 前缀）。
+- 字体：标题 `font-serif`（中文推荐 Noto Serif SC / 思源宋体），正文 `font-sans` 系统 UI 字体栈或 Noto Sans SC；**不引入 Inter / Roboto / Geist**。
+- **形状例外说明**：按钮 / 输入框 / 标签的 `rounded-full`（pill）是本文档 REQUIRED 明确要求的，允许使用；「禁止使用完美的圆形/矩形」针对的是装饰性几何形状与卡片（卡片一律 `rounded-[2rem]`）。
+
+> **变更 v1.1（2026-10-06）**：新增本节，明确本文档是前端样式唯一事实源，并与 `CONVENTIONS.md` 的 Tailwind / shadcn 约定对齐。
+
 # Hard Prompt
 
 ## 什么时候用

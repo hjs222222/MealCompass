@@ -28,21 +28,23 @@ mealcompass/
 │   │   ├── shopping_service.py
 │   │   └── feedback_service.py
 │   │
-│   ├── domain/               # 领域层：纯逻辑，无 IO，可单测
+│   ├── domain/               # 领域层：纯逻辑，无 IO，可单测（唯一无 IO 层）
+│   │   ├── ports.py          # 所有 Protocol：RecipeRepository / Retriever / LLMClient
 │   │   ├── models/           # 实体、值对象
 │   │   ├── rules/            # 规则引擎
 │   │   │   ├── base.py       # Rule Protocol
-│   │   │   ├── allergen.py
-│   │   │   ├── glycemic.py
-│   │   │   ├── sodium.py
-│   │   │   ├── protein.py
+│   │   │   ├── allergen.py   # MVP（全人群「忌口」硬约束）
+│   │   │   ├── glycemic.py   # MVP（diabetes）
+│   │   │   ├── protein.py    # MVP（fitness）
+│   │   │   ├── sodium.py     # P1（hypertension）
 │   │   │   └── registry.py   # 规则注册表
 │   │   └── profiles/         # 人群画像定义
 │   │       ├── base.py
-│   │       ├── general.py
-│   │       ├── fitness.py
-│   │       ├── diabetes.py
-│   │       └── child.py
+│   │       ├── general.py    # MVP
+│   │       ├── fitness.py    # MVP
+│   │       ├── diabetes.py   # MVP
+│   │       ├── child.py      # P1
+│   │       └── hypertension.py  # P1
 │   │
 │   ├── agents/               # Agent 层：LangGraph 编排
 │   │   ├── state.py          # State 定义
@@ -149,7 +151,7 @@ api → services → domain
 | **auth**          | 注册/登录/JWT         | `AuthService`           | infra.db, core.security       |
 | **profile**       | 画像 CRUD、人群路由   | `ProfileService`        | domain.profiles, infra.db     |
 | **recipe**        | 菜谱 CRUD、详情、缩放 | `RecipeService`         | infra.db                      |
-| **rag**           | 检索、重排、索引      | `Retriever` Protocol    | infra.vector_store, infra.llm |
+| **rag**           | 检索、重排、索引      | `Retriever`（定义在 `domain/ports.py`） | infra.vector_store, infra.llm |
 | **agent**         | LangGraph 编排        | `run_agent(state)`      | rag, domain.rules, infra.llm  |
 | **rules**         | 硬约束判定            | `RuleEngine.evaluate()` | domain.models                 |
 | **recommend**     | 推荐编排              | `RecommendService`      | agent, profile, recipe        |
@@ -354,7 +356,11 @@ CREATE INDEX ON recipes USING gin(tags);
 ## 五、关键接口草案
 
 ```python
-# rag/retriever.py
+# domain/ports.py —— 所有 Protocol 集中在此文件
+class RecipeRepository(Protocol):
+    async def get(self, recipe_id: str) -> Recipe | None: ...
+    async def search(self, filters: dict, limit: int) -> list[Recipe]: ...
+
 class Retriever(Protocol):
     async def search(
         self,
@@ -374,7 +380,7 @@ async def run_agent(
     conversation_id: str,
 ) -> AgentOutput: ...
 
-# infra/llm_client.py
+# domain/ports.py（实现：infra/llm_client.py）
 class LLMClient(Protocol):
     async def chat(self, messages: list[Message], **kwargs) -> str: ...
     async def structured(self, messages: list[Message], schema: type[BaseModel]) -> BaseModel: ...
@@ -384,13 +390,14 @@ class LLMClient(Protocol):
 
 - 所有 IO 操作 `async`
 - 所有对外接口用 Pydantic 模型
-- Protocol 定义在 domain 或 rag，实现在 infra
+- Protocol 统一定义在 `domain/ports.py`，实现在 `infra/`（LLM、向量库）与 `rag/`（检索编排）
 
 ## 六、迭代日志（每次修改必记）
 
 | 版本 | 日期       | 变更     | 原因     |
 | ---- | ---------- | -------- | -------- |
 | v0.1 | 2026-10-06 | 初始草案 | 建立基线 |
+| v0.2 | 2026-10-06 | 统一跨文档冲突（人群范围、profiles 归属、接口位置、会话存储、工期）；补充接口清单 | 消除与 PRD/TECH_STACK/CONVENTIONS 的歧义 |
 
 **迭代规则**：
 
@@ -405,6 +412,7 @@ class LLMClient(Protocol):
 # 架构约束
 - 分层: api → services → domain / agents / rag → infra
 - domain 层不依赖任何其他层，纯逻辑
+- 人群画像放 `domain/profiles/`，跨层接口 Protocol 放 `domain/ports.py`
 - api 层不直接调 infra，必须经过 services
 - 同层模块不互相调用
 
@@ -431,15 +439,15 @@ class LLMClient(Protocol):
 - 不把硬约束判断交给 LLM
 ```
 
-## 八、待定问题（下轮迭代讨论）
+## 八、待定问题（v0.2 已全部定稿）
 
-| 问题         | 选项                 | 倾向                    |
-| ------------ | -------------------- | ----------------------- |
-| 规则热更新   | YAML 文件 vs DB      | 先 YAML，量大再迁       |
-| 会话存储     | PG JSONB vs Redis    | PG 持久化，Redis 做缓存 |
-| 前端 SSR/CSR | 全 SSR vs 混合       | 推荐页 CSR，详情页 SSR  |
-| 评估触发     | 手动 vs CI           | 先手动，稳定后入 CI     |
-| 语音         | Web Speech vs 第三方 | 先 Web Speech，零成本   |
+| 问题         | 选项                 | **已定结论（v0.2）**                                  |
+| ------------ | -------------------- | ----------------------------------------------------- |
+| 规则热更新   | YAML 文件 vs DB      | **YAML 文件**（`data/rules/`），量大再迁 DB           |
+| 会话存储     | PG JSONB vs Redis    | **PostgresSaver 为唯一事实源**，Redis 只做缓存与限流  |
+| 前端 SSR/CSR | 全 SSR vs 混合       | **混合**：推荐 / 对话 / 购物清单 CSR，落地页 / 详情页 SSR |
+| 评估触发     | 手动 vs CI           | **先手动**（`scripts/eval.py`），M2 稳定后再入 CI     |
+| 语音         | Web Speech vs 第三方 | **Web Speech API**，零成本                            |
 
 ---
 
