@@ -138,7 +138,8 @@ pnpm typecheck && pnpm lint && pnpm build
 | 改菜谱解析       | `backend/scripts/import_howtocook.py` + `backend/tests/unit/test_import_howtocook.py` + `docs/DATA_SOURCES.md` |
 | 加/改领域模型    | `backend/domain/models/` + `docs/ARCHITECTURE.md` §3.1                                                          |
 | 加可观测埋点     | `backend/infra/observability.py` 的 `SpanName` + `docs/CONVENTIONS.md` §4.5                                   |
-| 加/改食材词表    | `data/ingredients/aliases.yaml` + `backend/domain/ingredients.py` + `import_report.json` 的 `unmapped_top`   |
+| 改 Embedding / Rerank | `backend/domain/ports.py`（契约）+ `backend/infra/embedding_client.py` / `rerank_client.py`；远程走 SiliconFlow，本地兜底可选 |
+| 加/改食材词表 | `data/ingredients/aliases.yaml` + `backend/domain/ingredients.py` + `import_report.json` 的 `unmapped_top`   |
 | 加规则           | `data/rules/*.yaml` + `backend/domain/rules/` + `docs/PRD.md` 模块 D                                           |
 | 查 Langfuse 数据 | 用`langfuse` 技能；读取走 **Observations API v2**（旧 `/api/public/traces` 对本组织返回 410）              |
 

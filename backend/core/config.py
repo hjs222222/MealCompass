@@ -38,9 +38,12 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-chat"
 
-    # ---- 检索模型 ----
+    # ---- 检索模型（远程优先、本地兜底，D17）----
     embedding_model: str = "BAAI/bge-m3"
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
+    embedding_api_key: str | None = None  # 不填则复用 LLM_API_KEY
+    embedding_base_url: str | None = None  # 不填则复用 LLM_BASE_URL
+    enable_local_fallback: bool = True  # 装了 sentence-transformers 才真的生效
 
     # ---- Langfuse 可观测 ----
     langfuse_public_key: str | None = None
@@ -59,6 +62,16 @@ class Settings(BaseSettings):
     def tracing_enabled(self) -> bool:
         """没配 key 就整体降级为 no-op，本地开发不被可观测性阻塞。"""
         return bool(self.langfuse_public_key and self.langfuse_secret_key)
+
+    @property
+    def embedding_key(self) -> str | None:
+        """embedding / rerank 用的 key：单独配了用自己的，否则复用 LLM 的。"""
+        return self.embedding_api_key or self.llm_api_key
+
+    @property
+    def embedding_url(self) -> str:
+        """embedding / rerank 的基址，同样支持单独覆盖。"""
+        return self.embedding_base_url or self.llm_base_url
 
 
 @lru_cache(maxsize=1)

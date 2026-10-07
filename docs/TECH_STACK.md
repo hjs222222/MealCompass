@@ -137,6 +137,19 @@ backend/
 - **远程优先、本地兜底**：Embedding（BGE-M3）与重排（bge-reranker-v2-m3）默认走 SiliconFlow / DeepSeek 等 OpenAI 兼容接口；远程失败或离线时回落 Ollama / sentence-transformers 本地推理
 - 两种实现都由 `domain/ports.py` 的 `EmbeddingClient` / `RerankClient` Protocol 约束，调用方不感知（`infra/` 出 Remote / Local / Fallback 三个实现）
 - trace 的 metadata 标注实际走了远程还是本地、是否触发降级，降级率可在 Langfuse 看板观察
+
+**已实测可用的远程模型（SiliconFlow，2026-10-07 用真实 key 验证）**
+
+| 用途 | 模型 | 实测结果 |
+| --- | --- | --- |
+| Embedding | `BAAI/bge-m3` | 输出 **1024 维**，与 `vector(1024)` 对齐；同 key 另有 `Pro/BAAI/bge-m3` |
+| 重排 | `BAAI/bge-reranker-v2-m3` | query「番茄炒蛋」→「西红柿炒鸡蛋」0.9994、「番茄鸡蛋汤」0.9897、「红烧肉」0.0060，排序正确 |
+| 对话 | `deepseek-ai/DeepSeek-V3` | 可正常返回；平台另有 V3.2 / V4-Flash / V4-Pro 与 GLM、Kimi、Qwen 等（chat 共 64 个） |
+| 基址 | `https://api.siliconflow.cn/v1` | OpenAI 兼容；embedding / rerank 走各自端点，不是 `/chat/completions` |
+
+已落地：`infra/embedding_client.py` 与 `infra/rerank_client.py` —— `Remote*`（远程）/ `Local*`（sentence-transformers，可选）/ `Fallback*`（降级组合）；调用方只依赖 `domain/ports.py` 的 Protocol。远程走不通时自动切本地，并把 provider 与降级次数暴露给 trace。
+
+> 不选 `Qwen/Qwen3-Embedding-*` 的原因：维度与既有的 `vector(1024)` 不匹配，换维度要重建索引与迁移，收益不抵成本。
 - LLM 通过 API 调用，保留 `LLMClient` 抽象层，便于切换
 - 单次推荐 Token 成本 ≤ ¥0.05
 

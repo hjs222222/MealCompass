@@ -410,6 +410,8 @@ class RerankClient(Protocol):
 - 所有 IO 操作 `async`
 - 所有对外接口用 Pydantic 模型
 - Protocol 统一定义在 `domain/ports.py`，实现在 `infra/`（LLM、向量库）与 `rag/`（检索编排）
+- Embedding / Rerank 的协议实现落在 `infra/embedding_client.py` 与 `infra/rerank_client.py`：`Remote*`（SiliconFlow OpenAI 兼容）+ `Local*`（sentence-transformers，可选）+ `Fallback*`（远程优先、本地兜底）；`rag/` 只负责编排（切分、检索、融合、索引），不直接持有模型客户端
+- 降级事实通过 `Fallback*.last_provider` / `degraded_count` / `last_error` 暴露，由调用方写进 trace 的 metadata
 
 ## 六、迭代日志（每次修改必记）
 
@@ -422,6 +424,7 @@ class RerankClient(Protocol):
 | v0.5 | 2026-10-06 | 新增 `data/ingredients/aliases.yaml` 归一化词典与 `domain/ingredients.py`；`Ingredient` 增加 `canonical` / `category` | 检索与忌口过滤需要把「西红柿/番茄」收敛到同一个标准名 |
 | v0.6 | 2026-10-06 | 落库实现：`infra/tables.py`（12 张表）+ Alembic `0001_initial_schema`；§3.1 补实现要点 | 数据齐了要进库，检索/规则才有落点 |
 | v0.7 | 2026-10-06 | 迁移 0002：`servings_text` / `amount_text` 放宽为 TEXT；`slug` 改由 `source_path` 派生 | 实机入库暴露的两个真问题：原文超长、同名菜谱 slug 冲突 |
+| v0.8 | 2026-10-07 | 落地 `domain/ports.py` 的 EmbeddingClient / RerankClient 与 `infra/` 的 Remote / Local / Fallback 三实现 | T1.7：模型调用要远程优先、本地兜底且可观测 |
 
 **迭代规则**：
 

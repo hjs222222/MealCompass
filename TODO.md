@@ -1,4 +1,6 @@
-# MealCompass 待办清单
+cd D:\Allcode\MealCompass
+git add -A
+git commit -m "feat: T1.7 Embedding/Rerank 双通道（远程优先 SiliconFlow + 本地兜底）" -m "契约：domain/ports.py 定义 EmbeddingClient / RerankClient`n实现：infra/embedding_client.py 与 rerank_client.py —— Remote / Local / Fallback 三实现`n远程：SiliconFlow OpenAI 兼容，BAAI/bge-m3 输出 1024 维，bge-reranker-v2-m3 排序正确（真调用验证）`n降级：远程失败切本地并记录 provider/次数/原因，无本地则抛原始异常`n测试：112 passed（104 单测 + 8 集成，含 3 个真实远程调用）"# MealCompass 待办清单
 
 > 文档来源：`README.md`、`docs/PRD.md`、`docs/TECH_STACK.md`、`docs/ARCHITECTURE.md`、`docs/CONVENTIONS.md`、`docs/UI_STYLE.md`
 > 更新：2026-10-06 ｜ 状态：**跨文档冲突已全部统一**（结论见 §1 与 §9）
@@ -16,27 +18,28 @@
 
 ## 1. 已定决策（全部完成，直接执行）
 
-| # | 议题 | 结论 | 落点 |
-| --- | --- | --- | --- |
-| D1 | 规则热更新 | **YAML 文件**（`data/rules/`），量大再迁 DB | ARCHITECTURE §8 |
-| D2 | 会话存储 | **`PostgresSaver` 为唯一事实源**，Redis 只做缓存与限流 | CONVENTIONS §4.2 |
-| D3 | 前端渲染 | 推荐 / 对话 / 购物清单 **CSR**；落地页 / 菜谱详情 / legal **SSR** | CONVENTIONS §3.2 |
-| D4 | 评估触发 | **先手动**（`scripts/eval.py`），M2 稳定后再入 CI | CONVENTIONS §7.3 |
-| D5 | 语音 | **Web Speech API**（客户端，零成本） | PRD F-E3 |
-| D6 | 目标用户 | **取消医学人群细分，面向所有普通人**（2026-10-06 决策）。约束只来自用户自己的忌口、可用时间、可用厨具与口味 | PRD §1.3 / §2 / 模块 D |
-| D7 | 登录方式 | **邮箱 + 密码 + JWT**，不做第三方 OAuth | PRD §1.5 / F-A1 |
-| D8 | 画像归属 | **`backend/domain/profiles/`**（domain 是唯一无 IO 层） | TECH_STACK §2.2 |
-| D9 | 前端目录 | **不用 `src/`**：`app/`、`components/ui/`、`lib/` | CONVENTIONS §1.2 / §3.3 |
-| D10 | 文档命名与路径 | 规范名迁到 `docs/`，README 在根目录 | README 文档索引 |
-| D11 | 接口位置 | 所有 Protocol 集中 **`domain/ports.py`**，实现在 `infra/`、`rag/` | ARCHITECTURE §5 |
-| D12 | 工期 | **总计 4-6 周**：M1 1-1.5 / M2 1.5-2 / M3 1-1.5 / M4 0.5-1 周 | README 路线图 / PRD §9 |
-| D13 | 可观测优先级 | Langfuse + Sentry 属 **MVP**，未配置 key 时**自动降级为本地日志** | CONVENTIONS §8.2 / TECH_STACK §2.6 |
+| #   | 议题           | 结论                                                                                                              | 落点                                 |
+| --- | -------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| D1  | 规则热更新     | **YAML 文件**（`data/rules/`），量大再迁 DB                                                               | ARCHITECTURE §8                     |
+| D2  | 会话存储       | **`PostgresSaver` 为唯一事实源**，Redis 只做缓存与限流                                                    | CONVENTIONS §4.2                    |
+| D3  | 前端渲染       | 推荐 / 对话 / 购物清单**CSR**；落地页 / 菜谱详情 / legal **SSR**                                      | CONVENTIONS §3.2                    |
+| D4  | 评估触发       | **先手动**（`scripts/eval.py`），M2 稳定后再入 CI                                                         | CONVENTIONS §7.3                    |
+| D5  | 语音           | **Web Speech API**（客户端，零成本）                                                                        | PRD F-E3                             |
+| D6  | 目标用户       | **取消医学人群细分，面向所有普通人**（2026-10-06 决策）。约束只来自用户自己的忌口、可用时间、可用厨具与口味 | PRD §1.3 / §2 / 模块 D             |
+| D7  | 登录方式       | **邮箱 + 密码 + JWT**，不做第三方 OAuth                                                                     | PRD §1.5 / F-A1                     |
+| D8  | 画像归属       | **`backend/domain/profiles/`**（domain 是唯一无 IO 层）                                                   | TECH_STACK §2.2                     |
+| D9  | 前端目录       | **不用 `src/`**：`app/`、`components/ui/`、`lib/`                                                   | CONVENTIONS §1.2 / §3.3            |
+| D10 | 文档命名与路径 | 规范名迁到`docs/`，README 在根目录                                                                              | README 文档索引                      |
+| D11 | 接口位置       | 所有 Protocol 集中**`domain/ports.py`**，实现在 `infra/`、`rag/`                                      | ARCHITECTURE §5                     |
+| D12 | 工期           | **总计 4-6 周**：M1 1-1.5 / M2 1.5-2 / M3 1-1.5 / M4 0.5-1 周                                               | README 路线图 / PRD §9              |
+| D13 | 可观测优先级   | Langfuse + Sentry 属**MVP**，未配置 key 时**自动降级为本地日志**                                      | CONVENTIONS §8.2 / TECH_STACK §2.6 |
 
-- [x] **D14 菜谱数据来源与许可**：已定 —— **HowToCook**，License 为 **Unlicense（公有领域）**，可自由复制/修改/分发/商用，合规无风险。仓库已 pull 到 `HowToCook/`（373 道菜 + tips，Markdown 格式）
-- [x] **D15 `reference/` 用途**：已定 —— 存放参考资料，**目前尚未开始收集**（目录已可写）
-- [x] **D16 营养数据缺口**：已定 —— **放弃人群细分**。HowToCook 只提供预估热量与难度，没有蛋白质/GI/钠，不足以支撑医学约束；改为只展示热量、把「少油少盐低卡」降级为软偏好（PRD 模块 D、F-D4）
-- [x] **D17 远程优先 / 本地兜底**：已定（**模型线**）—— Embedding（BGE-M3）与重排（bge-reranker-v2-m3）默认走 SiliconFlow / DeepSeek 等 OpenAI 兼容接口；本地兜底用 Ollama / sentence-transformers；两者都由 `domain/ports.py` 的 Protocol 约束，trace 标注 provider 与降级
-- [x] **D18 配图策略**：已定 —— **配图随仓库直接提交、保留原图**（108.7 MB，共 354 张），理由是网页端要展示成品图、原图观感更好；`.gitattributes` 已按二进制处理
+- [X] **D14 菜谱数据来源与许可**：已定 —— **HowToCook**，License 为 **Unlicense（公有领域）**，可自由复制/修改/分发/商用，合规无风险。仓库已 pull 到 `HowToCook/`（373 道菜 + tips，Markdown 格式）
+- [X] **D15 `reference/` 用途**：已定 —— 存放参考资料，**目前尚未开始收集**（目录已可写）
+- [X] **D16 营养数据缺口**：已定 —— **放弃人群细分**。HowToCook 只提供预估热量与难度，没有蛋白质/GI/钠，不足以支撑医学约束；改为只展示热量、把「少油少盐低卡」降级为软偏好（PRD 模块 D、F-D4）
+- [X] **D17 远程优先 / 本地兜底**：已定（**模型线**）—— Embedding（BGE-M3）与重排（bge-reranker-v2-m3）默认走 SiliconFlow / DeepSeek 等 OpenAI 兼容接口；本地兜底用 Ollama / sentence-transformers；两者都由 `domain/ports.py` 的 Protocol 约束，trace 标注 provider 与降级
+  - 供应商与模型已实测确定（2026-10-07）：SiliconFlow `https://api.siliconflow.cn/v1`，embedding `BAAI/bge-m3`（1024 维）、rerank `BAAI/bge-reranker-v2-m3`、chat `deepseek-ai/DeepSeek-V3`；key 已写入 `.env`（不入库）
+- [X] **D18 配图策略**：已定 —— **配图随仓库直接提交、保留原图**（108.7 MB，共 354 张），理由是网页端要展示成品图、原图观感更好；`.gitattributes` 已按二进制处理
 
 ---
 
@@ -46,26 +49,26 @@
 - [ ] **P2 确定 Langfuse 形态**：自托管（docker）还是 Cloud，拿到 public/secret key（未配置也能开发，只是降级为本地日志）
 - [ ] **P3 确认机器资源**：bge-reranker-v2-m3 内存需求 ≥ 8GB；有 GPU 更好
 - [ ] **P4 解决模型下载**：BGE-M3 + reranker 走 ModelScope 镜像或 Ollama（TECH_STACK §6 避坑）
-- [x] **P5 菜谱数据**：HowToCook 已在本地（373 道菜，Markdown），License = **Unlicense（公有领域）**；按 D16 只取预估热量，不做营养推断
+- [X] **P5 菜谱数据**：HowToCook 已在本地（373 道菜，Markdown），License = **Unlicense（公有领域）**；按 D16 只取预估热量，不做营养推断
 - [ ] **P6 部署账号**：Vercel（前端）+ 云服务器（后端）+ 域名/HTTPS（PRD F-H5、§7）
 
 ---
 
 ## 3. 阶段 P0：仓库与工程基线（0.5-1 周，全部 [MVP]）
 
-- [x] ~~**T0.1 建目录骨架**~~（部分完成：`docs/` 已建，`backend/` `frontend/` `data/` 待建）
-- [x] **T0.2 文档落地并改名**：已完成 —— `docs/{PRD,TECH_STACK,ARCHITECTURE,CONVENTIONS,UI_STYLE}.md` + 根 `README.md`
-- [x] **T0.2b 删除旧目录 `goal/`**：已完成（已确认目录不存在）
+- [X] ~~**T0.1 建目录骨架**~~（部分完成：`docs/` 已建，`backend/` `frontend/` `data/` 待建）
+- [X] **T0.2 文档落地并改名**：已完成 —— `docs/{PRD,TECH_STACK,ARCHITECTURE,CONVENTIONS,UI_STYLE}.md` + 根 `README.md`
+- [X] **T0.2b 删除旧目录 `goal/`**：已完成（已确认目录不存在）
 - [ ] **T0.3 补齐仓库根文件**：`LICENSE`(MIT)、`.gitignore`（含 `.idea/`）、`.env.example`（`README.md` 环境变量表全量）
-- [x] **T0.3a 密钥防泄漏**：`.gitignore`（含 `.env`、`langfuse.txt`、`.idea/`、`HowToCook/`）+ `.env`（真实密钥，已忽略）+ `.env.example` —— 已完成
-- [x] **T0.12 Langfuse 可观测接入**：`backend/core/config.py`、`backend/infra/observability.py`、`backend/scripts/trace_smoke.py`；已真实发送并**在 API 侧核验通过**（Observations API v2 读回 6 条观察）
-- [x] **T0.13 `AGENTS.md`**：所有 AI 工具的入口约束（阅读顺序 / 边界 / 收尾流程 / 汇报格式），已落地并被本会话加载
+- [X] **T0.3a 密钥防泄漏**：`.gitignore`（含 `.env`、`langfuse.txt`、`.idea/`、`HowToCook/`）+ `.env`（真实密钥，已忽略）+ `.env.example` —— 已完成
+- [X] **T0.12 Langfuse 可观测接入**：`backend/core/config.py`、`backend/infra/observability.py`、`backend/scripts/trace_smoke.py`；已真实发送并**在 API 侧核验通过**（Observations API v2 读回 6 条观察）
+- [X] **T0.13 `AGENTS.md`**：所有 AI 工具的入口约束（阅读顺序 / 边界 / 收尾流程 / 汇报格式），已落地并被本会话加载
 - [ ] **T0.4 写 `.cursorrules`**：合并 `TECH_STACK §4`、`ARCHITECTURE §7`、`CONVENTIONS §9.3` 三份约束
 - [ ] **T0.5 后端工具链**：`pyproject.toml`（ruff `line-length=120`、`target py311`、`select=["E","F","I","UP","B","SIM"]`；pytest + coverage ≥ 70%）、`uv` 初始化
 - [ ] **T0.6 前端工具链**：`package.json`、`tsconfig.json`（strict）、Tailwind v4（CSS-first `@theme`，**不产 `tailwind.config.js`**）、`npx shadcn@latest init`
 - [ ] **T0.7 设计系统 token 落地**：把 `docs/UI_STYLE.md` 的自然有机风写进 `frontend/app/globals.css` 的 `@theme`（米色 `#faf6f1`、石棕 `#5c4033`、鼠尾草绿 `#8b9d77`、暖褐 `#d4a373`、`font-serif` 标题、`rounded-[2rem]` 卡片）
-- [x] **T0.8 `docker-compose.yml`**：postgres（`pgvector/pgvector:pg16`）+ redis（`redis:7-alpine`）默认启动，均带 healthcheck；backend / frontend 挂 `app` profile。⚠️ **本机未装 Docker，尚未实机验证**（只做了静态检查）
-- [x] **T0.9 数据库迁移**：Alembic `0001_initial_schema`（13 张表 / 13 个索引，含 HNSW + GIN + vector 扩展），`downgrade` 可回滚；DSN 从 `.env` 读，`alembic.ini` 保持纯 ASCII。**离线渲染 DDL 已验证**（6.5 KB SQL），但未连真实库执行（本机无 Docker）
+- [X] **T0.8 `docker-compose.yml`**：postgres（`pgvector/pgvector:pg16`）+ redis（`redis:7-alpine`）默认启动，均带 healthcheck；backend / frontend 挂 `app` profile。⚠️ **本机未装 Docker，尚未实机验证**（只做了静态检查）
+- [X] **T0.9 数据库迁移**：Alembic `0001_initial_schema`（13 张表 / 13 个索引，含 HNSW + GIN + vector 扩展），`downgrade` 可回滚；DSN 从 `.env` 读，`alembic.ini` 保持纯 ASCII。**离线渲染 DDL 已验证**（6.5 KB SQL），但未连真实库执行（本机无 Docker）
 - [ ] **T0.10 CI**：`.github/workflows/ci.yml` → 后端 `ruff check . && ruff format --check . && pytest --cov=. --cov-fail-under=70`；前端 `pnpm typecheck && pnpm lint && pnpm build`
 - [ ] **T0.11 Git 流程**：`main`（只收 PR）/ `develop` / `feature/xxx` / `fix/xxx`；commit 用 `<type>: <description>`
 
@@ -76,19 +79,21 @@
 来源：`docs/PRD.md` 模块 B/E、`docs/ARCHITECTURE.md` §3、`docs/TECH_STACK.md` §2.1/2.3
 
 ### 4.1 数据层
-- [x] **T1.1 建核心表**：12 张业务表已定义在 `backend/infra/tables.py` 并由 Alembic 落库（users / user_profiles / recipes / recipe_steps / ingredients / ingredient_aliases / recipe_ingredients / recipe_embeddings / conversations / messages / feedbacks / shopping_lists）
-- [x] **T1.1b 数据入库脚本**：`scripts/seed_recipes.py`，**已对真实库跑通且幂等**（连跑两次数字一致）：recipes 372 / recipe_ingredients 3902 / recipe_steps 3806 / ingredients 115 / ingredient_aliases 294。未归一化的关联行 1035（`ingredient_id IS NULL`，原文留在 `name_raw`）
-- [x] **T0.9 实机验证**：Docker 起来后 `alembic upgrade head` 真跑通（PostgreSQL 16.15 + pgvector 0.8.7，13 表 / 33 索引）；另补迁移 `0002` 放宽两个原文字段
-- [x] **T1.2 HowToCook → JSON 入库脚本**：`scripts/import_howtocook.py`，372/372 解析成功、34→38 个单测全绿。三种用量语法（`名称 400 g` / `名称 = 2 斤` / `名称 15g*份数`）已覆盖；86 条上游没给数字的用量按「不编造」留原文
-- [x] **T1.2b 菜谱模型加 images 字段**：`Recipe.images`（数据集内相对路径，346 张，0 缺失）+ `Recipe.external_images`（2 条外链）；含括号文件名（`石凉粉(冰粉)成品1.jpg`）已正确处理
-- [x] **T1.3 食材归一化**：`data/ingredients/aliases.yaml`（112 个标准食材 / 别名）+ `domain/ingredients.py`（纯逻辑）+ `infra/ingredient_dict.py`（加载）。`Ingredient` 落 `canonical` / `category`；**命中率 73.5%**（2867/3902 条），未收录 856 种已按频次进 `import_report.json` 的 `unmapped_top`
+
+- [X] **T1.1 建核心表**：12 张业务表已定义在 `backend/infra/tables.py` 并由 Alembic 落库（users / user_profiles / recipes / recipe_steps / ingredients / ingredient_aliases / recipe_ingredients / recipe_embeddings / conversations / messages / feedbacks / shopping_lists）
+- [X] **T1.1b 数据入库脚本**：`scripts/seed_recipes.py`，**已对真实库跑通且幂等**（连跑两次数字一致）：recipes 372 / recipe_ingredients 3902 / recipe_steps 3806 / ingredients 115 / ingredient_aliases 294。未归一化的关联行 1035（`ingredient_id IS NULL`，原文留在 `name_raw`）
+- [X] **T0.9 实机验证**：Docker 起来后 `alembic upgrade head` 真跑通（PostgreSQL 16.15 + pgvector 0.8.7，13 表 / 33 索引）；另补迁移 `0002` 放宽两个原文字段
+- [X] **T1.2 HowToCook → JSON 入库脚本**：`scripts/import_howtocook.py`，372/372 解析成功、34→38 个单测全绿。三种用量语法（`名称 400 g` / `名称 = 2 斤` / `名称 15g*份数`）已覆盖；86 条上游没给数字的用量按「不编造」留原文
+- [X] **T1.2b 菜谱模型加 images 字段**：`Recipe.images`（数据集内相对路径，346 张，0 缺失）+ `Recipe.external_images`（2 条外链）；含括号文件名（`石凉粉(冰粉)成品1.jpg`）已正确处理
+- [X] **T1.3 食材归一化**：`data/ingredients/aliases.yaml`（112 个标准食材 / 别名）+ `domain/ingredients.py`（纯逻辑）+ `infra/ingredient_dict.py`（加载）。`Ingredient` 落 `canonical` / `category`；**命中率 73.5%**（2867/3902 条），未收录 856 种已按频次进 `import_report.json` 的 `unmapped_top`
 - [ ] **T1.3b 词表扩充** `[P1]`：按 `unmapped_top` 频次继续补（当前头部是冷门香料与地方食材，长尾收益递减）
 - [ ] **T1.4 热量字段处理** `[MVP]`：缺失即标注「未知」，**不可编造**；不做蛋白质 / GI / 钠推断
 - [ ] **T1.5 索引** `[MVP]`：HNSW(`m=16, ef_construction=64`) + `gin(tsv)` + `recipes(time_minutes)` + `gin(tags)`
 
 ### 4.2 RAG
+
 - [ ] **T1.6 双层切分** `[MVP]`：卡片级 + 步骤级分别索引；单条上下文 ≤ 模型窗口 60%（PRD F-B2）
-- [ ] **T1.7 Embedding 封装** `[MVP]`：BGE-M3，1024 维（`rag/embedding.py`）
+- [X] **T1.7 Embedding / Rerank 双通道**：`domain/ports.py`（Protocol）+ `infra/embedding_client.py` / `infra/rerank_client.py`（Remote SiliconFlow / Local sentence-transformers / Fallback）。**真连 SiliconFlow 验证**：`BAAI/bge-m3` 输出 1024 维、`bge-reranker-v2-m3` 把「西红柿炒鸡蛋」排在「红烧肉」之前；104 个单测 + 3 个真实集成测试通过
 - [ ] **T1.8 混合检索** `[MVP]`：向量 Top50 + BM25(rank-bm25 + jieba) Top50 → RRF → Top10（PRD F-B3）
 - [ ] **T1.9 重排** `[MVP]`：bge-reranker-v2-m3，Top10 延迟 ≤ 500ms（PRD F-B4）
 - [ ] **T1.10 硬约束下推** `[MVP]`：时间/厨具/忌口下推到 SQL WHERE 或向量过滤，**禁止检索后再过滤**（PRD F-B5）
@@ -97,6 +102,7 @@
 - [ ] **T1.13 接口先行** `[MVP]`：在 `domain/ports.py` 定义 `RecipeRepository` / `Retriever` / `LLMClient`
 
 ### 4.3 前后端骨架
+
 - [ ] **T1.14 FastAPI 入口与分层** `[MVP]`：`main.py` + `api/v1/*` 薄路由（≤10 行）+ `api/deps.py`；api 不直连 infra
 - [ ] **T1.15 配置外置** `[MVP]`：`core/config.py` 用 pydantic-settings 读 `.env`，dev/prod 分离
 - [ ] **T1.16 异常/日志** `[MVP]`：`core/exceptions.py`、`core/logging.py` 结构化日志
@@ -104,6 +110,7 @@
 - [ ] **T1.18 前端数据层** `[MVP]`：`lib/api.ts`、TanStack Query hooks、Zustand
 
 ### 4.4 M1 验收
+
 - [ ] **A1.1** Recall@5 ≥ 85%，并给出「纯向量 vs 混合」消融对比（PRD F-B3）
 - [ ] **A1.2** 重排后 nDCG@5 相比未重排提升 ≥ 10%（PRD F-B4）
 
@@ -114,6 +121,7 @@
 来源：`docs/PRD.md` 模块 C/D、`docs/CONVENTIONS.md` §4、`docs/ARCHITECTURE.md` §2
 
 ### 5.1 规则引擎（domain 层，纯逻辑、零 IO）
+
 - [ ] **T2.1 `Rule` Protocol + 注册表** `[MVP]`：`domain/rules/{base,registry}.py`
 - [ ] **T2.2 规则 YAML 化** `[MVP]`：`data/rules/*.yaml`（hard_constraints 过滤 / soft_preferences 降权）
 - [ ] **T2.3 规则实现** `[MVP]`：allergen / time_limit / tools（硬）+ taste（软）
@@ -123,6 +131,7 @@
 - [ ] **T2.7 新增约束零代码** `[MVP]`：加 1 条 rules YAML 即可
 
 ### 5.2 通用约束集（无人群细分）
+
 - [ ] **T2.8 忌口/过敏硬过滤** `[MVP]`：食材级，含同义词命中（PRD F-D1）
 - [ ] **T2.9 时间与厨具过滤** `[MVP]`：下推到检索层（PRD F-D2）
 - [ ] **T2.10 口味软偏好** `[MVP]`：辣度/清淡/菜系，YAML 可配（PRD F-D3）
@@ -133,6 +142,7 @@
 - [ ] **T2.15 注册/登录** `[MVP]`：**邮箱 + 密码 + JWT**（注册/登录/登出/刷新）、bcrypt、多用户数据隔离（PRD F-A1）
 
 ### 5.3 LangGraph Agent
+
 - [ ] **T2.16 State 定义** `[MVP]`：TypedDict、扁平、累积字段用 reducer（CONVENTIONS §4.1）
 - [ ] **T2.17 七个节点** `[MVP]`：parse → clarify → search → filter → rank → reflect → output（PRD F-C6）
 - [ ] **T2.18 条件边** `[MVP]`：信息不足→澄清；检索为空→放宽；校验失败→重试
@@ -147,12 +157,14 @@
 - [ ] **T2.26 多轮对话** `[P1]`：上下文 ≥ 10 轮、指代消解（PRD F-C7）
 
 ### 5.4 菜谱与反馈
+
 - [ ] **T2.27 菜谱详情 + 份量缩放** `[MVP]`：1-8 人，服务端二次校验（PRD F-E1）
 - [ ] **T2.28 食材替代** `[MVP]`：≥ 30 组，标注口味/口感影响（PRD F-E2）
 - [ ] **T2.29 反馈四类** `[MVP]`：点赞/踩/收藏/做过，写入记忆（PRD F-G1）
 - [ ] **T2.30 历史记录** `[MVP]`：推荐 + 烹饪历史、短期不重复推荐（PRD F-G2）
 
 ### 5.5 评估体系
+
 - [ ] **T2.31 标注评估集** `[MVP]`：100 条（PRD §8）
 - [ ] **T2.32 评估脚本** `[MVP]`：`scripts/eval.py`，Recall / nDCG / 约束满足 + 同步 Langfuse
 - [ ] **T2.33 RAGAS** `[MVP]`：Faithfulness / Answer Relevancy / Context Precision / Context Recall
@@ -210,31 +222,31 @@
 
 ## 9. 冲突处理记录（已全部统一）
 
-| # | 原冲突 | 统一结论 | 改动落点 |
-| --- | --- | --- | --- |
-| ① | 儿童人群 P1 vs `[MVP]`；M2 只说「3 人群」 | **已升级为产品决策：整块取消医学人群细分**（D6 / D16） | PRD §1.3 / §2 / 模块 D；README 全局约定 |
-| ② | `profiles/` 层级位置不一致 | 统一到 `domain/profiles/` | TECH_STACK §2.2/§4；PRD F-H1/§6；ARCHITECTURE §1/§2/§7 |
-| ③ | 前端 `src/` 前缀不一致 | 统一「不用 `src/`」 | CONVENTIONS §1.2/§3.3/§9.3；TECH_STACK §2.5 |
-| ④ | README 引用不存在的 `docs/*.md`；`ARCH.md` 名实不符 | 文档按规范名迁到 `docs/`，`ARCH.md` → `TECH_STACK.md` | 全部文件已迁移 |
-| ⑤ | Langfuse 标 P1 却又是 MVP | 按 MVP，但 key 缺失时降级为本地日志 | CONVENTIONS §8.2；TECH_STACK §2.6；README 全局约定 |
-| ⑥ | 工期 5-8 周 vs 4-6 周 | 统一 4-6 周并配平里程碑 | README 路线图；PRD §9 |
-| ⑦ | 规范内部 `src/components/ui/` 与 `components/ui/` 并存 | 统一 `components/ui/` | CONVENTIONS §3.3 |
-| ⑧ | 环境变量清单两处不一致（缺 model / Sentry） | 以 README 表为准，CONVENTIONS 补齐并标注可留空 | CONVENTIONS §8.2；README 环境变量表 |
-| ⑨ | UI 文档内部「禁止完美圆形」vs「按钮必须 `rounded-full`」 | 明确 pill 形状是允许的例外 | UI_STYLE 配套实现约定 |
-| ⑩ | 字体自检禁用 Inter/Roboto/Geist，但 Next 默认就用 | 指定 `font-serif`（Noto Serif SC）+ 系统/Noto Sans SC 正文栈 | UI_STYLE 配套实现约定 |
+| #  | 原冲突                                                    | 统一结论                                                      | 改动落点                                                     |
+| -- | --------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
+| ① | 儿童人群 P1 vs`[MVP]`；M2 只说「3 人群」                | **已升级为产品决策：整块取消医学人群细分**（D6 / D16）  | PRD §1.3 / §2 / 模块 D；README 全局约定                    |
+| ② | `profiles/` 层级位置不一致                              | 统一到`domain/profiles/`                                    | TECH_STACK §2.2/§4；PRD F-H1/§6；ARCHITECTURE §1/§2/§7 |
+| ③ | 前端`src/` 前缀不一致                                   | 统一「不用`src/`」                                          | CONVENTIONS §1.2/§3.3/§9.3；TECH_STACK §2.5              |
+| ④ | README 引用不存在的`docs/*.md`；`ARCH.md` 名实不符    | 文档按规范名迁到`docs/`，`ARCH.md` → `TECH_STACK.md`   | 全部文件已迁移                                               |
+| ⑤ | Langfuse 标 P1 却又是 MVP                                 | 按 MVP，但 key 缺失时降级为本地日志                           | CONVENTIONS §8.2；TECH_STACK §2.6；README 全局约定         |
+| ⑥ | 工期 5-8 周 vs 4-6 周                                     | 统一 4-6 周并配平里程碑                                       | README 路线图；PRD §9                                       |
+| ⑦ | 规范内部`src/components/ui/` 与 `components/ui/` 并存 | 统一`components/ui/`                                        | CONVENTIONS §3.3                                            |
+| ⑧ | 环境变量清单两处不一致（缺 model / Sentry）               | 以 README 表为准，CONVENTIONS 补齐并标注可留空                | CONVENTIONS §8.2；README 环境变量表                         |
+| ⑨ | UI 文档内部「禁止完美圆形」vs「按钮必须`rounded-full`」 | 明确 pill 形状是允许的例外                                    | UI_STYLE 配套实现约定                                        |
+| ⑩ | 字体自检禁用 Inter/Roboto/Geist，但 Next 默认就用         | 指定`font-serif`（Noto Serif SC）+ 系统/Noto Sans SC 正文栈 | UI_STYLE 配套实现约定                                        |
 
 ---
 
 ## 10. 风险与范围控制
 
-| 风险 | 应对 |
-| --- | --- |
-| 数据版权 | 只用开源/授权数据，标注来源 |
+| 风险     | 应对                             |
+| -------- | -------------------------------- |
+| 数据版权 | 只用开源/授权数据，标注来源      |
 | 内容合规 | 免责声明 + 非医疗建议 + 数据可删 |
-| LLM 幻觉 | 引用强制 + 规则校验 + 反思重试 |
-| 范围膨胀 | 严格按 MVP/P1/P2 分级 |
-| 成本失控 | 限流 + 缓存 + 降级 |
-| 时间不足 | 优先保 MVP，P1 可延后 |
+| LLM 幻觉 | 引用强制 + 规则校验 + 反思重试   |
+| 范围膨胀 | 严格按 MVP/P1/P2 分级            |
+| 成本失控 | 限流 + 缓存 + 降级               |
+| 时间不足 | 优先保 MVP，P1 可延后            |
 
 **范围红线**：约束做扎实 > 功能堆砌；P1 只挑 2-3 个做深；P2 全部写「未来工作」。
 
