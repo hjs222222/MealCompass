@@ -27,19 +27,25 @@ from infra.observability import ObservationType, SpanName, traced
 from infra.tables import recipe_embeddings, recipes
 from rag.corpus import CardCorpus
 from rag.fusion import DEFAULT_RRF_K, reciprocal_rank_fusion
+from rag.reranker import rerank_candidates
 
 VECTOR_TOP_N = 50  # 向量通道召回数（PRD F-B3：Top 50）
 BM25_TOP_N = 50  # 关键词通道召回数（PRD F-B3：Top 50）
 
 
 class HybridRetriever:
-    """实现 `domain/ports.Retriever` 的混合检索器。"""
+    """实现 `domain/ports.Retriever` 的混合检索器。
+
+    ``reranker`` 可选（T1.9）：提供则 RRF Top10 后交给重排（失败降级回 RRF 顺序）；
+    不提供则保持 RRF 顺序返回（纯 T1.8 行为）。
+    """
 
     def __init__(
         self,
         embedder: Any,
         corpus: CardCorpus,
         *,
+        reranker: Any | None = None,
         engine: AsyncEngine | None = None,
         vector_top_n: int = VECTOR_TOP_N,
         bm25_top_n: int = BM25_TOP_N,
@@ -47,6 +53,7 @@ class HybridRetriever:
     ) -> None:
         self._embedder = embedder
         self._corpus = corpus
+        self._reranker = reranker
         self._engine = engine or get_engine()
         self._vector_top_n = max(1, vector_top_n)
         self._bm25_top_n = max(1, bm25_top_n)
@@ -94,12 +101,22 @@ class HybridRetriever:
                 for rank, (recipe_id, score, channels) in enumerate(fused, start=1)
             ]
 
+            reranked = self._reranker is not None
+            if reranked and candidates:
+                candidates = await rerank_candidates(cleaned, candidates, self._reranker, corpus=self._corpus)
+
+            degraded = (
+                any(candidate.degraded for candidate in candidates)
+                or getattr(self._embedder, "last_provider", None) == "local"
+            )
+
             span.update(
                 output={
                     "recipe_ids": [candidate.recipe_id for candidate in candidates],
                     "vector_hits": len(vector_hits),
                     "bm25_hits": len(bm25_hits),
-                    "degraded": getattr(self._embedder, "last_provider", None) == "local",
+                    "reranked": reranked,
+                    "degraded": degraded,
                 }
             )
             return candidates

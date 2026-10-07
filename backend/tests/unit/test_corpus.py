@@ -50,5 +50,11 @@ def test_name_of_resolves_recipe_name() -> None:
     assert corpus.name_of("00000000-0000-0000-0000-000000000000") is None
 
 
+def test_text_of_resolves_card_document() -> None:
+    corpus = CardCorpus(_documents())
+    assert corpus.text_of(R2) == "红烧肉\n肥而不腻。\n食材：五花肉、冰糖、生抽、八角"
+    assert corpus.text_of("00000000-0000-0000-0000-000000000000") is None
+
+
 def test_doc_ids_are_exposed_as_strings() -> None:
     assert CardCorpus(_documents()).doc_ids == [R1, R2, R3]

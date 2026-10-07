@@ -428,6 +428,7 @@ class RerankClient(Protocol):
 | v0.9 | 2026-10-07 | 新增 `infra/model_cache.py`（模型缓存固定到仓库内）；本地兜底用真模型验证（本地/远程余弦 0.9999） | 缓存路径不一致会白下 4.4 GB；本地兜底必须证明与远程同空间 |
 | v1.0 | 2026-10-07 | T1.6 落地：`rag/chunking.py` 双层切分（卡片=菜名+简介+食材 / 步骤=原文）+ `scripts/build_index.py`（embedding + tsv 入库，幂等可重跑）；`rag/tokenization.py` 统一 jieba 分词，tsv 用 `to_tsvector('simple')` | 双层索引是混合检索（T1.8）的落点；tsv 与 BM25 共用同一分词，词项一致 |
 | v1.1 | 2026-10-07 | T1.8 落地：`rag/retriever.py` HybridRetriever（向量 Top50 + BM25 Top50 → RRF → Top10）；`rag/corpus.py` CardCorpus 与向量共用同一卡片文档；`scripts/smoke_retrieval.py` 真查询冒烟 | 混合检索是 F-B3 的落点；BM25 语料与向量 embed 的是同一份文本，两个通道才可融合 |
+| v1.2 | 2026-10-07 | T1.9 落地：`rag/reranker.py` 重排编排（失败降级回 RRF 顺序并标记 degraded）；`HybridRetriever` 可选 `reranker` 参数；`smoke_retrieval --rerank` 真远程验证 | F-B4 重排落点；重排绝不能拖垮检索，降级是契约 |
 
 **迭代规则**：
 
