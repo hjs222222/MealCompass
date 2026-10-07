@@ -2,7 +2,7 @@
 
 > **本文件是所有 AI 编码工具（Cursor / Claude Code / Codex / DSH / Copilot 等）在本仓库工作的第一入口。**
 > 人类贡献者请先读 [`README.md`](./README.md) 与 [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md)。
-> 本文件若与 `docs/` 冲突，以 `README.md` 的「全局约定（唯一口径）」为准；发现冲突**先修文档再写代码**。
+> 本文件若与 `docs/` 冲突，以 `README.md` 的「全局约定唯一口径）」为准；发现冲突**先修文档再写代码**。
 
 ---
 
@@ -16,16 +16,16 @@
 
 ## 1. 动手前的阅读顺序
 
-| 顺序 | 文件 | 什么时候必读 |
-| --- | --- | --- |
-| 1 | [`README.md`](./README.md) → 「全局约定（唯一口径）」 | **每次任务开始必读** |
-| 2 | [`TODO.md`](./TODO.md) | 每次任务开始必读（确认任务编号与验收标准） |
-| 3 | [`docs/PRD.md`](./docs/PRD.md) | 涉及功能范围、验收标准（DoD）时 |
-| 4 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | 涉及目录、模块、数据模型、接口时 |
-| 5 | [`docs/TECH_STACK.md`](./docs/TECH_STACK.md) | 引入依赖、选型、版本锚定时 |
-| 6 | [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md) | **写任何代码前必读** |
-| 7 | [`docs/UI_STYLE.md`](./docs/UI_STYLE.md) | 写任何前端界面时 |
-| 8 | [`docs/DATA_SOURCES.md`](./docs/DATA_SOURCES.md) | 涉及外部数据、新增数据源时 |
+| 顺序 | 文件                                                    | 什么时候必读                               |
+| ---- | ------------------------------------------------------- | ------------------------------------------ |
+| 1    | [`README.md`](./README.md) → 「全局约定（唯一口径）」 | **每次任务开始必读**                 |
+| 2    | [`TODO.md`](./TODO.md)                                 | 每次任务开始必读（确认任务编号与验收标准） |
+| 3    | [`docs/PRD.md`](./docs/PRD.md)                         | 涉及功能范围、验收标准（DoD）时            |
+| 4    | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)       | 涉及目录、模块、数据模型、接口时           |
+| 5    | [`docs/TECH_STACK.md`](./docs/TECH_STACK.md)           | 引入依赖、选型、版本锚定时                 |
+| 6    | [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md)         | **写任何代码前必读**                 |
+| 7    | [`docs/UI_STYLE.md`](./docs/UI_STYLE.md)               | 写任何前端界面时                           |
+| 8    | [`docs/DATA_SOURCES.md`](./docs/DATA_SOURCES.md)       | 涉及外部数据、新增数据源时                 |
 
 > 任务相关但文档没写清楚的，**先问人，不要猜**。
 
@@ -82,6 +82,7 @@
 > `-p no:cacheprovider` 是因为沙箱里 `.pytest_cache` 建不出来。
 >
 > **沙箱跑测试的两条硬规矩**（本机实测，踩过）：
+>
 > 1. 跑之前把临时目录指到工作区内：`$env:TEMP='<仓库>\.tmp'`；否则 pytest 会因为写 `C:\Windows\Temp` 被拒。
 > 2. **不要用 `tmp_path` fixture**（它同样写系统临时目录）。需要测试数据时，把文件放 `backend/tests/fixtures/` 下，用 `Path(__file__).resolve().parents[1] / "fixtures" / "xxx.yaml"` 读取。
 
@@ -92,16 +93,16 @@ pnpm typecheck && pnpm lint && pnpm build
 
 ### 5.2 同步文档（改了行为就必须改文档，**文档与代码同一个 PR**）
 
-| 改了什么 | 必须同步更新 |
-| --- | --- |
+| 改了什么                      | 必须同步更新                                                   |
+| ----------------------------- | -------------------------------------------------------------- |
 | 架构 / 目录 / 数据模型 / 接口 | `docs/ARCHITECTURE.md`（**并在 §六 迭代日志加一行**） |
-| 开发规范 | `docs/CONVENTIONS.md`（**并在 §十 迭代日志加一行**） |
-| 功能范围 / 验收标准 | `docs/PRD.md` |
-| 技术选型 / 依赖版本 | `docs/TECH_STACK.md` |
-| 外部数据 / 数据字段 | `docs/DATA_SOURCES.md` |
-| 界面样式 | `docs/UI_STYLE.md` |
-| 任何任务进度 | `TODO.md`（勾选完成项、补新任务、记录新决策） |
-| 全局口径变化 | `README.md` → 「全局约定（唯一口径）」 |
+| 开发规范                      | `docs/CONVENTIONS.md`（**并在 §十 迭代日志加一行**）  |
+| 功能范围 / 验收标准           | `docs/PRD.md`                                                |
+| 技术选型 / 依赖版本           | `docs/TECH_STACK.md`                                         |
+| 外部数据 / 数据字段           | `docs/DATA_SOURCES.md`                                       |
+| 界面样式                      | `docs/UI_STYLE.md`                                           |
+| 任何任务进度                  | `TODO.md`（勾选完成项、补新任务、记录新决策）                |
+| 全局口径变化                  | `README.md` → 「全局约定（唯一口径）」                      |
 
 ### 5.3 提交
 
@@ -132,14 +133,14 @@ pnpm typecheck && pnpm lint && pnpm build
 
 ## 6. 常见任务的入口
 
-| 任务 | 从哪开始 |
-| --- | --- |
-| 改菜谱解析 | `backend/scripts/import_howtocook.py` + `backend/tests/unit/test_import_howtocook.py` + `docs/DATA_SOURCES.md` |
-| 加/改领域模型 | `backend/domain/models/` + `docs/ARCHITECTURE.md` §3.1 |
-| 加可观测埋点 | `backend/infra/observability.py` 的 `SpanName` + `docs/CONVENTIONS.md` §4.5 |
-| 加/改食材词表 | `data/ingredients/aliases.yaml` + `backend/domain/ingredients.py` + `import_report.json` 的 `unmapped_top` |
-| 加规则 | `data/rules/*.yaml` + `backend/domain/rules/` + `docs/PRD.md` 模块 D |
-| 查 Langfuse 数据 | 用 `langfuse` 技能；读取走 **Observations API v2**（旧 `/api/public/traces` 对本组织返回 410） |
+| 任务             | 从哪开始                                                                                                             |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 改菜谱解析       | `backend/scripts/import_howtocook.py` + `backend/tests/unit/test_import_howtocook.py` + `docs/DATA_SOURCES.md` |
+| 加/改领域模型    | `backend/domain/models/` + `docs/ARCHITECTURE.md` §3.1                                                          |
+| 加可观测埋点     | `backend/infra/observability.py` 的 `SpanName` + `docs/CONVENTIONS.md` §4.5                                   |
+| 加/改食材词表    | `data/ingredients/aliases.yaml` + `backend/domain/ingredients.py` + `import_report.json` 的 `unmapped_top`   |
+| 加规则           | `data/rules/*.yaml` + `backend/domain/rules/` + `docs/PRD.md` 模块 D                                           |
+| 查 Langfuse 数据 | 用`langfuse` 技能；读取走 **Observations API v2**（旧 `/api/public/traces` 对本组织返回 410）              |
 
 ---
 

@@ -166,12 +166,19 @@ cd mealcompass
 cp .env.example .env
 # 编辑 .env，填入 LLM_API_KEY 等
 
-# 启动全栈
+# 启动依赖（postgres + redis）
+# backend / frontend 在 app profile 下，等各自 Dockerfile 就绪后：docker compose --profile app up -d
 docker compose up -d
 
-# 初始化数据库与索引
-docker compose exec backend python scripts/seed_recipes.py
-docker compose exec backend python scripts/build_index.py
+# 建表（Alembic，schema 事实源是 backend/infra/tables.py）
+cd backend && .venv/Scripts/python.exe -m alembic upgrade head && cd ..
+
+# 解析原始数据并灌库（幂等，可重复跑）
+cd backend
+.venv/Scripts/python.exe -m scripts.import_howtocook   # HowToCook markdown -> JSON
+.venv/Scripts/python.exe -m scripts.seed_recipes        # JSON + 食材词典 -> PostgreSQL
+.venv/Scripts/python.exe -m scripts.build_index.py      # 建向量索引（T1.6 落地后）
+cd ..
 ```
 
 访问：

@@ -166,6 +166,17 @@ api → services → domain
 
 ### 3.1 核心表
 
+> ⚠️ **实现以 `backend/infra/tables.py` 为准**（v0.6 起），下面是设计草图。已落地的细化：
+>
+> - `difficulty` 用 `SMALLINT` + `CHECK (BETWEEN 1 AND 5)`（导入器产出的是 1-5 星整数，不是字符串）
+> - `recipes` 补了 `slug` / `description` / `category` / `images` / `external_images` / `source_path` / `source_url` / `license` / `extra` / `servings_text`
+> - `recipe_ingredients` 补了 `name_raw` / `amount_text` / `amount_min` / `amount_max` / `note` / `per_serving`；**`ingredient_id` 可空**（词表未收录的食材没有标准实体）
+> - `recipe_steps` 加 `(recipe_id, step_no)` 唯一约束
+> - 索引：`recipe_embeddings.embedding` 与 `recipe_steps.embedding` 各建 HNSW（m=16, ef_construction=64, cosine）；`recipe_embeddings.tsv` 与 `recipes.tags` 建 GIN
+> - 迁移与 metadata 的漂移由 `tests/unit/test_schema_metadata.py` 自动拦截
+> - `slug` 由 `source_path` 派生（上游有两道菜 H1 同名「鸡蛋羹」，用「分类-菜名」会撞唯一约束）
+> - `servings_text` / `amount_text` 这类**上游原文**字段用 `TEXT`：实测有 257 字的原文，VARCHAR(n) 会直接让入库失败
+
 ```sql
 -- 用户
 users (
@@ -409,6 +420,8 @@ class RerankClient(Protocol):
 | v0.3 | 2026-10-06 | **取消医学人群细分**，规则改为通用约束（忌口/时间/厨具/口味）；新增 EmbeddingClient / RerankClient 接口（远程优先、本地兜底） | 医学营养数据不可得，避免不可验证的约束 |
 | v0.4 | 2026-10-06 | 菜谱模型新增 `images` / `external_images`；354 张配图随菜谱入库 | 网页端详情页需要成品图，纯文本 RAG 之外还要展示 |
 | v0.5 | 2026-10-06 | 新增 `data/ingredients/aliases.yaml` 归一化词典与 `domain/ingredients.py`；`Ingredient` 增加 `canonical` / `category` | 检索与忌口过滤需要把「西红柿/番茄」收敛到同一个标准名 |
+| v0.6 | 2026-10-06 | 落库实现：`infra/tables.py`（12 张表）+ Alembic `0001_initial_schema`；§3.1 补实现要点 | 数据齐了要进库，检索/规则才有落点 |
+| v0.7 | 2026-10-06 | 迁移 0002：`servings_text` / `amount_text` 放宽为 TEXT；`slug` 改由 `source_path` 派生 | 实机入库暴露的两个真问题：原文超长、同名菜谱 slug 冲突 |
 
 **迭代规则**：
 

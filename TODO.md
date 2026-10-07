@@ -64,8 +64,8 @@
 - [ ] **T0.5 后端工具链**：`pyproject.toml`（ruff `line-length=120`、`target py311`、`select=["E","F","I","UP","B","SIM"]`；pytest + coverage ≥ 70%）、`uv` 初始化
 - [ ] **T0.6 前端工具链**：`package.json`、`tsconfig.json`（strict）、Tailwind v4（CSS-first `@theme`，**不产 `tailwind.config.js`**）、`npx shadcn@latest init`
 - [ ] **T0.7 设计系统 token 落地**：把 `docs/UI_STYLE.md` 的自然有机风写进 `frontend/app/globals.css` 的 `@theme`（米色 `#faf6f1`、石棕 `#5c4033`、鼠尾草绿 `#8b9d77`、暖褐 `#d4a373`、`font-serif` 标题、`rounded-[2rem]` 卡片）
-- [ ] **T0.8 `docker-compose.yml`**：backend / frontend / `pgvector/pgvector:pg16` / `redis:7-alpine`
-- [ ] **T0.9 数据库迁移**：Alembic 初始化，每次迁移可回滚
+- [x] **T0.8 `docker-compose.yml`**：postgres（`pgvector/pgvector:pg16`）+ redis（`redis:7-alpine`）默认启动，均带 healthcheck；backend / frontend 挂 `app` profile。⚠️ **本机未装 Docker，尚未实机验证**（只做了静态检查）
+- [x] **T0.9 数据库迁移**：Alembic `0001_initial_schema`（13 张表 / 13 个索引，含 HNSW + GIN + vector 扩展），`downgrade` 可回滚；DSN 从 `.env` 读，`alembic.ini` 保持纯 ASCII。**离线渲染 DDL 已验证**（6.5 KB SQL），但未连真实库执行（本机无 Docker）
 - [ ] **T0.10 CI**：`.github/workflows/ci.yml` → 后端 `ruff check . && ruff format --check . && pytest --cov=. --cov-fail-under=70`；前端 `pnpm typecheck && pnpm lint && pnpm build`
 - [ ] **T0.11 Git 流程**：`main`（只收 PR）/ `develop` / `feature/xxx` / `fix/xxx`；commit 用 `<type>: <description>`
 
@@ -76,7 +76,9 @@
 来源：`docs/PRD.md` 模块 B/E、`docs/ARCHITECTURE.md` §3、`docs/TECH_STACK.md` §2.1/2.3
 
 ### 4.1 数据层
-- [ ] **T1.1 建核心表** `[MVP]`：`users` / `user_profiles` / `recipes` / `recipe_steps` / `ingredients` / `ingredient_aliases` / `recipe_ingredients` / `recipe_embeddings` / `conversations` / `messages` / `feedbacks` / `shopping_lists`（UUID 主键、JSONB、向量 1024）
+- [x] **T1.1 建核心表**：12 张业务表已定义在 `backend/infra/tables.py` 并由 Alembic 落库（users / user_profiles / recipes / recipe_steps / ingredients / ingredient_aliases / recipe_ingredients / recipe_embeddings / conversations / messages / feedbacks / shopping_lists）
+- [x] **T1.1b 数据入库脚本**：`scripts/seed_recipes.py`，**已对真实库跑通且幂等**（连跑两次数字一致）：recipes 372 / recipe_ingredients 3902 / recipe_steps 3806 / ingredients 115 / ingredient_aliases 294。未归一化的关联行 1035（`ingredient_id IS NULL`，原文留在 `name_raw`）
+- [x] **T0.9 实机验证**：Docker 起来后 `alembic upgrade head` 真跑通（PostgreSQL 16.15 + pgvector 0.8.7，13 表 / 33 索引）；另补迁移 `0002` 放宽两个原文字段
 - [x] **T1.2 HowToCook → JSON 入库脚本**：`scripts/import_howtocook.py`，372/372 解析成功、34→38 个单测全绿。三种用量语法（`名称 400 g` / `名称 = 2 斤` / `名称 15g*份数`）已覆盖；86 条上游没给数字的用量按「不编造」留原文
 - [x] **T1.2b 菜谱模型加 images 字段**：`Recipe.images`（数据集内相对路径，346 张，0 缺失）+ `Recipe.external_images`（2 条外链）；含括号文件名（`石凉粉(冰粉)成品1.jpg`）已正确处理
 - [x] **T1.3 食材归一化**：`data/ingredients/aliases.yaml`（112 个标准食材 / 别名）+ `domain/ingredients.py`（纯逻辑）+ `infra/ingredient_dict.py`（加载）。`Ingredient` 落 `canonical` / `category`；**命中率 73.5%**（2867/3902 条），未收录 856 种已按频次进 `import_report.json` 的 `unmapped_top`

@@ -469,7 +469,7 @@ def parse_recipe_markdown(
     images, external_images = extract_images(text, source_path)
     return Recipe(
         id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"howtocook:{source_path}")),
-        slug=f"{category}-{name}",
+        slug=source_path.removesuffix(".md").replace("/", "-"),
         name=name,
         category=category,
         description=_first_paragraph(text[title_match.end() :]),

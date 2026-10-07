@@ -120,6 +120,10 @@ class IngredientDictionary:
     def __len__(self) -> int:
         return len(self._entries)
 
+    def entries(self) -> tuple[CanonicalIngredient, ...]:
+        """全部标准食材（种子数据导入用）。"""
+        return tuple(self._entries)
+
     def aliases_of(self, canonical_name: str) -> tuple[str, ...]:
         entry = self._by_key.get(clean_name(canonical_name))
         return (entry.name, *entry.aliases) if entry else ()

@@ -255,6 +255,20 @@ def test_category_is_empty_when_file_sits_at_root() -> None:
     assert recipe.category == ""
 
 
+def test_slug_is_derived_from_source_path_so_it_stays_unique() -> None:
+    """上游有两道菜 H1 同名（`鸡蛋羹/鸡蛋羹.md` 与 `鸡蛋羹/蒸箱鸡蛋羹.md`）。
+
+    slug 若由「分类-菜名」拼出来就会撞 `recipes.slug` 的唯一约束，
+    所以必须由 source_path 派生（source_path 天然唯一）。
+    """
+    first = parse_recipe_markdown(FIXTURE, source_path="vegetable_dish/鸡蛋羹/鸡蛋羹.md")
+    second = parse_recipe_markdown(FIXTURE, source_path="vegetable_dish/鸡蛋羹/蒸箱鸡蛋羹.md")
+
+    assert first.slug == "vegetable_dish-鸡蛋羹-鸡蛋羹"
+    assert second.slug == "vegetable_dish-鸡蛋羹-蒸箱鸡蛋羹"
+    assert first.slug != second.slug
+
+
 def test_parse_recipe_rejects_markdown_without_required_sections() -> None:
     with pytest.raises(ValueError, match="缺少章节"):
         parse_recipe_markdown("# 随便\n\n没有标准章节", source_path="dishes/x/y.md")

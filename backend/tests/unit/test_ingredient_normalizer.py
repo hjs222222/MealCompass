@@ -112,6 +112,11 @@ def test_size_counts_canonical_entries() -> None:
     assert len(DICTIONARY) == 6
 
 
+def test_entries_exposes_canonical_list() -> None:
+    """入库脚本要遍历所有标准食材（种子数据），不能去摸私有属性。"""
+    assert {entry.name for entry in DICTIONARY.entries()} == {"番茄", "大蒜", "生抽", "老抽", "淀粉", "盐"}
+
+
 # ---------------------------------------------------------------- YAML 加载（IO 层）
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"

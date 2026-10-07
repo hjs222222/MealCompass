@@ -1,0 +1,88 @@
+# MealCompass 本地全栈编排（T0.8）
+#
+# 默认 `docker compose up -d` 只起 **postgres + redis** —— 这两个现在就能用
+# （Alembic 建表、灌数据都靠它们）。
+#
+# backend / frontend 挂在 `app` profile 下，等各自的 Dockerfile 与 main.py 就绪后再启用：
+#     docker compose --profile app up -d
+#
+# 注意：本机（2026-10-06）未安装 Docker，本文件**尚未实机验证**，见 TODO T0.8。
+name: mealcompass
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: mealcompass-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mealcompass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mealcompass}
+      POSTGRES_DB: ${POSTGRES_DB:-mealcompass}
+      # 中文排序 / 全文检索需要正确的 locale
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mealcompass} -d ${POSTGRES_DB:-mealcompass}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: mealcompass-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- 应用层
+  backend:
+    profiles: ["app"]
+    build:
+      context: ./backend
+    container_name: mealcompass-backend
+    env_file: .env
+    environment:
+      # 容器内要用服务名而不是 localhost，覆盖 .env 里的本地 DSN
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mealcompass}:${POSTGRES_PASSWORD:-mealcompass}@postgres:5432/${POSTGRES_DB:-mealcompass}
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-dev}
+    ports:
+      - "8000:8000"
+    volumes:
+      # 代码挂载便于热重载；原始数据只读挂进去（导入器要用）
+      - ./backend:/app
+      - ./data:/data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    profiles: ["app"]
+    build:
+      context: ./frontend
+    container_name: mealcompass-frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

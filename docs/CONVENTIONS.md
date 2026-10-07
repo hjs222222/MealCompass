@@ -317,6 +317,7 @@ async def search_recipes(query: str, filters: dict, top_k: int = 10) -> list[dic
 ### 5.1 表设计
 
 - 主键统一 `UUID`
+- 承载**上游原文**的字段（如 `servings_text`、`amount_text`、`description`）一律用 `TEXT`，不要用 `VARCHAR(n)`：长度不由我们拍板，实测有 257 字的原文
 - 时间字段统一 `TIMESTAMP WITH TIME ZONE`
 - JSON 字段用 `JSONB`（非 `JSON`）
 - 向量维度固定 1024（BGE-M3）
@@ -461,6 +462,9 @@ services:
 - 前后端独立容器，各自 Dockerfile
 - 环境变量通过 `.env` 注入，不硬编码
 - 生产环境 Next.js 使用 `standalone` 输出模式
+- `docker compose up -d` 默认只起 **postgres + redis**（当前阶段就靠这两个）；`backend` / `frontend` 挂在 `app` profile 下，用 `docker compose --profile app up -d` 启用
+- 建表走 Alembic：`cd backend && .venv\Scripts\python.exe -m alembic upgrade head`；**schema 的唯一事实源是 `backend/infra/tables.py`**，改表必须同时改迁移并跑 `test_schema_metadata.py` 的漂移检查
+- `alembic.ini` 必须保持纯 ASCII：alembic 用系统 locale 编码读它（zh-CN Windows 是 GBK），中文注释会让它直接崩
 
 ### 8.2 环境变量
 
@@ -552,6 +556,8 @@ services:
 | v1.1 | 2026-10-06 | 统一跨文档冲突；补充渲染策略、Tailwind v4、会话存储、环境变量清单 | 与 README、ARCHITECTURE、TECH_STACK 对齐，消除歧义 |
 | v1.2 | 2026-10-06 | 指向 `AGENTS.md` 作为 AI 入口；配图入库约定 | 让 AI 工具的阅读顺序与收尾流程有唯一出处 |
 | v1.3 | 2026-10-06 | 补充食材归一化词典的存放位置与维护规则 | T1.3 落地，避免词表散落在代码里 |
+| v1.4 | 2026-10-06 | 补 Docker Compose（profile 用法）与 Alembic 建表流程；`alembic.ini` 必须 ASCII | T0.8/T0.9 落地 |
+| v1.5 | 2026-10-06 | 补「上游原文字段一律用 TEXT」的规则 | 实机入库踩到 VARCHAR(160) 溢出 |
 
 **迭代规则**：
 
