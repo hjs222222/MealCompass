@@ -93,7 +93,7 @@
 - [X] **T1.6 双层切分** `[MVP]`：卡片级 + 步骤级分别索引；单条上下文 ≤ 模型窗口 60%（PRD F-B2）。落地：`rag/chunking.py`（卡片=菜名+简介+食材 / 步骤=原文）+ `scripts/build_index.py`；372 卡片 + 3806 步骤全量向量（1024 维）与 tsv 入库，SiliconFlow 远程批量
 - [X] **T1.7 Embedding / Rerank 双通道**：`domain/ports.py`（Protocol）+ `infra/embedding_client.py` / `infra/rerank_client.py`（Remote SiliconFlow / Local sentence-transformers / Fallback）。**真连 SiliconFlow 验证**：`BAAI/bge-m3` 输出 1024 维、`bge-reranker-v2-m3` 把「西红柿炒鸡蛋」排在「红烧肉」之前；104 个单测 + 3 个真实集成测试通过
   - 本地兜底已用**真模型**验证（T1.8 之前的空白补上）：本地/远程向量余弦 **0.9999**，降级后 `provider=local` 且向量仍是 1024 维；一键自查 `python -m scripts.check_model_clients`
-- [ ] **T1.8 混合检索** `[MVP]`：向量 Top50 + BM25(rank-bm25 + jieba) Top50 → RRF → Top10（PRD F-B3）
+- [X] **T1.8 混合检索** `[MVP]`：向量 Top50 + BM25(rank-bm25 + jieba) Top50 → RRF → Top10（PRD F-B3）。落地：`rag/retriever.py`（HybridRetriever，实现 `Retriever` Protocol）+ `rag/corpus.py`（CardCorpus，与向量共用同一卡片文档）；真实冒烟 3 查询 Top10 语义合理；`scripts/smoke_retrieval.py` 可复跑
 - [ ] **T1.9 重排** `[MVP]`：bge-reranker-v2-m3，Top10 延迟 ≤ 500ms（PRD F-B4）
 - [ ] **T1.10 硬约束下推** `[MVP]`：时间/厨具/忌口下推到 SQL WHERE 或向量过滤，**禁止检索后再过滤**（PRD F-B5）
 - [ ] **T1.11 引用与防幻觉** `[MVP]`：每条推荐附真实 `recipe_id`；引用准确率 ≥ 95%（PRD F-B6）

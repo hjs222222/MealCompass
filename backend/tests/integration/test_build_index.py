@@ -15,11 +15,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from core.config import get_settings
 from infra.tables import EMBEDDING_DIM
+from rag.corpus import load_card_documents
 from scripts.build_index import (
     IndexRecord,
     _assert_dimension,
     embed_in_chunks,
-    load_card_records,
     load_step_records,
     update_steps,
     upsert_cards,
@@ -87,7 +87,7 @@ async def test_card_index_roundtrip_in_rolled_back_transaction() -> None:
         async with engine.connect() as conn:
             transaction = await conn.begin()
             try:
-                cards = await load_card_records(conn, limit=3)
+                cards = await load_card_documents(conn, limit=3)
                 assert len(cards) == 3
                 # 卡片文档首行是菜名；食材段来自 recipe_ingredients.name_raw
                 assert all(record.text.split("\n", 1)[0] for record in cards)

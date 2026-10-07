@@ -40,14 +40,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection  # noqa: E402
 
 from infra.db import get_engine  # noqa: E402
 from infra.embedding_client import build_embedding_client  # noqa: E402
-from infra.tables import (  # noqa: E402
-    EMBEDDING_DIM,
-    recipe_embeddings,
-    recipe_ingredients,
-    recipe_steps,
-    recipes,
-)
-from rag.chunking import build_card_document, build_step_document  # noqa: E402
+from infra.tables import EMBEDDING_DIM, recipe_embeddings, recipe_steps  # noqa: E402
+from rag.chunking import build_step_document  # noqa: E402
+from rag.corpus import CardDocument, load_card_documents  # noqa: E402
 from rag.tokenization import tokenize_joined  # noqa: E402
 
 DEFAULT_BATCH_SIZE = 64  # 每块送 embedding 的文档数；RemoteEmbedding 内部还会再拆 HTTP 批次
@@ -55,40 +50,13 @@ DEFAULT_BATCH_SIZE = 64  # 每块送 embedding 的文档数；RemoteEmbedding �
 
 @dataclass(frozen=True)
 class IndexRecord:
-    """一条待入库文档：``key`` 是写回时的主键（卡片=recipe_id，步骤=step_id）。"""
+    """一条待入库步骤文档：``key`` 是写回时的主键（步骤=step_id）。"""
 
     key: uuid.UUID
     text: str
 
 
 # --------------------------------------------------------------------- 读取
-
-
-async def load_card_records(conn: AsyncConnection, limit: int | None = None) -> list[IndexRecord]:
-    """从库中拼卡片文档。食材取 ``recipe_ingredients.name_raw``（关联表里只有食材，厨具已在 seed 时排除）。"""
-    statement = (
-        sa.select(
-            recipes.c.id,
-            recipes.c.name,
-            recipes.c.description,
-            sa.func.coalesce(sa.func.array_agg(recipe_ingredients.c.name_raw), sa.text("ARRAY[]::text[]")),
-        )
-        .select_from(recipes.outerjoin(recipe_ingredients, recipe_ingredients.c.recipe_id == recipes.c.id))
-        .group_by(recipes.c.id)
-        .order_by(recipes.c.id)
-    )
-    if limit is not None:
-        statement = statement.limit(limit)
-
-    records: list[IndexRecord] = []
-    for recipe_id, name, description, ingredient_names in (await conn.execute(statement)).all():
-        document = build_card_document(
-            name=name,
-            description=description,
-            ingredients=[raw for raw in (ingredient_names or []) if raw],
-        )
-        records.append(IndexRecord(key=recipe_id, text=document))
-    return records
 
 
 async def load_step_records(conn: AsyncConnection, limit: int | None = None) -> list[IndexRecord]:
@@ -116,7 +84,7 @@ def _assert_dimension(vectors: Sequence[Sequence[float]]) -> None:
 
 async def embed_in_chunks(
     embedder: Any,
-    records: Sequence[IndexRecord],
+    records: Sequence[CardDocument | IndexRecord],
     *,
     batch_size: int,
     label: str,
@@ -137,7 +105,7 @@ async def embed_in_chunks(
 
 
 async def upsert_cards(
-    conn: AsyncConnection, records: Sequence[IndexRecord], vectors: Sequence[Sequence[float]]
+    conn: AsyncConnection, records: Sequence[CardDocument], vectors: Sequence[Sequence[float]]
 ) -> None:
     """``recipe_embeddings``：upsert embedding + tsv（tsv 与向量来自同一文档）。"""
     # to_tsvector 的配置名必须是 regconfig，直接传 varchar 会报 function does not exist
@@ -197,7 +165,7 @@ async def build_all(
         async with get_engine().begin() as conn:
             if layer in {"all", "card"}:
                 print("卡片级：菜名 + 简介 + 食材 → recipe_embeddings", flush=True)
-                cards = await load_card_records(conn, limit)
+                cards = await load_card_documents(conn, limit)
                 card_vectors = await embed_in_chunks(embedder, cards, batch_size=batch_size, label="card")
                 await upsert_cards(conn, cards, card_vectors)
                 counts["cards"] = len(cards)

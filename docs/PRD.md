@@ -168,8 +168,8 @@ UserProfile:
 
 - 描述：向量（BGE-M3）+ BM25，RRF 融合
 - **DoD：**
-  - [ ] 向量与关键词各召回 Top 50
-  - [ ] RRF 融合后 Top 10 进入重排
+  - [X] 向量与关键词各召回 Top 50
+  - [X] RRF 融合后 Top 10 进入重排
   - [ ] Recall@5 ≥ 85%（在评估集上）
   - [ ] 提供消融对比：纯向量 vs 混合（写入 README）
 
