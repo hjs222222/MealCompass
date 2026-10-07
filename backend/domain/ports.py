@@ -9,7 +9,38 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
+from domain.models.recipe import Recipe
 from domain.models.retrieval import HardFilters, RecipeCandidate
+
+
+@runtime_checkable
+class RecipeRepository(Protocol):
+    """菜谱持久化访问接口。"""
+
+    async def get_by_id(self, recipe_id: str) -> Recipe | None:
+        """按真实 recipe_id 获取菜谱；不存在时返回 ``None``。"""
+        ...
+
+    async def search(self, filters: HardFilters | None = None, limit: int = 50) -> list[Recipe]:
+        """按硬约束检索菜谱，返回至多 ``limit`` 条结果。"""
+        ...
+
+
+@runtime_checkable
+class LLMClient(Protocol):
+    """文本消息补全接口。"""
+
+    model: str
+
+    async def complete(
+        self,
+        messages: Sequence[dict[str, str]],
+        *,
+        temperature: float = 0.1,
+        response_format: str | None = None,
+    ) -> str:
+        """根据消息生成文本。"""
+        ...
 
 
 @runtime_checkable

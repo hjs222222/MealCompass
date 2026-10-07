@@ -32,7 +32,7 @@
 | D12 | 工期           | **总计 4-6 周**：M1 1-1.5 / M2 1.5-2 / M3 1-1.5 / M4 0.5-1 周                                               | README 路线图 / PRD §9              |
 | D13 | 可观测优先级   | Langfuse + Sentry 属**MVP**，未配置 key 时**自动降级为本地日志**                                      | CONVENTIONS §8.2 / TECH_STACK §2.6 |
 
-- [X] **D14 菜谱数据来源与许可**：已定 —— **HowToCook**，License 为 **Unlicense（公有领域）**，可自由复制/修改/分发/商用，合规无风险。仓库已 pull 到 `HowToCook/`（373 道菜 + tips，Markdown 格式）
+- [X] **D14 菜谱数据来源与许可**：已定 —— **HowToCook**，License 为 **Unlicense（公有领域）**，可自由复制/修改/分发/商用，合规无风险。仓库已收录到 `data/raw/howtocook/`（372 道菜 + tips，Markdown 格式）
 - [X] **D15 `reference/` 用途**：已定 —— 存放参考资料，**目前尚未开始收集**（目录已可写）
 - [X] **D16 营养数据缺口**：已定 —— **放弃人群细分**。HowToCook 只提供预估热量与难度，没有蛋白质/GI/钠，不足以支撑医学约束；改为只展示热量、把「少油少盐低卡」降级为软偏好（PRD 模块 D、F-D4）
 - [X] **D17 远程优先 / 本地兜底**：已定（**模型线**）—— Embedding（BGE-M3）与重排（bge-reranker-v2-m3）默认走 SiliconFlow / DeepSeek 等 OpenAI 兼容接口；本地兜底用 Ollama / sentence-transformers；两者都由 `domain/ports.py` 的 Protocol 约束，trace 标注 provider 与降级
@@ -85,8 +85,8 @@
 - [X] **T1.2b 菜谱模型加 images 字段**：`Recipe.images`（数据集内相对路径，346 张，0 缺失）+ `Recipe.external_images`（2 条外链）；含括号文件名（`石凉粉(冰粉)成品1.jpg`）已正确处理
 - [X] **T1.3 食材归一化**：`data/ingredients/aliases.yaml`（112 个标准食材 / 别名）+ `domain/ingredients.py`（纯逻辑）+ `infra/ingredient_dict.py`（加载）。`Ingredient` 落 `canonical` / `category`；**命中率 73.5%**（2867/3902 条），未收录 856 种已按频次进 `import_report.json` 的 `unmapped_top`
 - [ ] **T1.3b 词表扩充** `[P1]`：按 `unmapped_top` 频次继续补（当前头部是冷门香料与地方食材，长尾收益递减）
-- [ ] **T1.4 热量字段处理** `[MVP]`：缺失即标注「未知」，**不可编造**；不做蛋白质 / GI / 钠推断
-- [ ] **T1.5 索引** `[MVP]`：HNSW(`m=16, ef_construction=64`) + `gin(tsv)` + `recipes(time_minutes)` + `gin(tags)`
+- [X] **T1.4 热量字段处理** `[MVP]`：缺失即标注「未知」，**不可编造**；不做蛋白质 / GI / 钠推断
+- [X] **T1.5 索引** `[MVP]`：HNSW(`m=16, ef_construction=64`) + `gin(tsv)` + `recipes(time_minutes)` + `gin(tags)`
 
 ### 4.2 RAG
 
@@ -95,10 +95,10 @@
   - 本地兜底已用**真模型**验证（T1.8 之前的空白补上）：本地/远程向量余弦 **0.9999**，降级后 `provider=local` 且向量仍是 1024 维；一键自查 `python -m scripts.check_model_clients`
 - [X] **T1.8 混合检索** `[MVP]`：向量 Top50 + BM25(rank-bm25 + jieba) Top50 → RRF → Top10（PRD F-B3）。落地：`rag/retriever.py`（HybridRetriever，实现 `Retriever` Protocol）+ `rag/corpus.py`（CardCorpus，与向量共用同一卡片文档）；真实冒烟 3 查询 Top10 语义合理；`scripts/smoke_retrieval.py` 可复跑
 - [X] **T1.9 重排** `[MVP]`：bge-reranker-v2-m3，Top10 延迟 ≤ 500ms（PRD F-B4）。落地：`rag/reranker.py`（`rerank_candidates`，失败降级回 RRF 顺序并标记 degraded）+ `HybridRetriever` 可选 `reranker` 参数；真远程冒烟稳态 342–438ms 达标
-- [ ] **T1.10 硬约束下推** `[MVP]`：时间/厨具/忌口下推到 SQL WHERE 或向量过滤，**禁止检索后再过滤**（PRD F-B5）
-- [ ] **T1.11 引用与防幻觉** `[MVP]`：每条推荐附真实 `recipe_id`；引用准确率 ≥ 95%（PRD F-B6）
+- [X] **T1.10 硬约束下推** `[MVP]`：时间/厨具/忌口下推到 SQL WHERE 或向量过滤，**禁止检索后再过滤**（PRD F-B5）。已构造独立 SQL 允许 ID 集合，向量与 BM25 各自在允许集合内召回；未知耗时在设置时间上限时严格排除
+- [X] **T1.11 引用与防幻觉** `[MVP]`：每条推荐附真实 `recipe_id`；引用准确率 ≥ 95%（PRD F-B6）。已新增 `Recommendation` 与纯领域引用校验：候选 ID/权威名称必须精确匹配，拒绝未知、重复或冲突引用
 - [X] **T1.12 建索引脚本** `[MVP]`：`scripts/build_index.py`（幂等可重跑；`--layer card|step|all` / `--limit` 支持；含向量维度断言与 tsv 写入）
-- [ ] **T1.13 接口先行** `[MVP]`：在 `domain/ports.py` 定义 `RecipeRepository` / `Retriever` / `LLMClient`
+- [X] **T1.13 接口先行** `[MVP]`：在 `domain/ports.py` 定义 `RecipeRepository` / `Retriever` / `LLMClient`。`RecipeRepository` 与 `LLMClient` 已采用 async Protocol；另有 `EmbeddingClient` / `RerankClient`
 
 ### 4.3 前后端骨架
 

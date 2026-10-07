@@ -50,5 +50,17 @@ def test_empty_query_or_corpus_returns_empty() -> None:
     assert BM25Index([], []).search(["鸡蛋"], top_n=5) == []
 
 
+def test_allowed_ids_limit_after_scoring_and_empty_intersection_is_empty() -> None:
+    index = BM25Index(
+        [f"recipe-{number}" for number in range(60)],
+        [["egg", f"token-{number}"] for number in range(60)],
+    )
+
+    hits = index.search(["egg", "token-59"], top_n=50, allowed_ids={"recipe-59"})
+
+    assert [doc_id for doc_id, _ in hits] == ["recipe-59"]
+    assert index.search(["egg"], top_n=50, allowed_ids={"missing"}) == []
+
+
 def test_top_n_is_respected() -> None:
     assert len(_index().search(["鸡蛋"], top_n=1)) == 1

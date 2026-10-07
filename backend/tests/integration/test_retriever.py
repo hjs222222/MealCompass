@@ -12,10 +12,12 @@ import json
 
 import asyncpg
 import pytest
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from core.config import get_settings
 from domain.models.retrieval import HardFilters
+from infra.tables import ingredients, recipes
 from rag.corpus import CardCorpus, load_card_documents
 from rag.retriever import HybridRetriever
 
@@ -100,12 +102,56 @@ async def test_mixed_retrieval_roundtrip() -> None:
 
 
 @requires_db
-async def test_retriever_rejects_non_empty_filters_until_t1_10() -> None:
+async def test_hard_filter_sql_semantics_against_postgres() -> None:
     engine = create_async_engine(get_settings().database_url)
     try:
-        retriever = HybridRetriever(embedder=FixedVectorEmbedder([0.0] * 1024), corpus=CardCorpus([]), engine=engine)
-        with pytest.raises(NotImplementedError):
-            await retriever.search("西红柿炒鸡蛋", filters=HardFilters(excluded_ingredients=["虾"]))
+        async with engine.begin() as conn:
+            ingredient_id = await conn.scalar(
+                sa.select(ingredients.c.id).where(sa.func.lower(ingredients.c.name) == "虾").limit(1)
+            )
+            if ingredient_id is None:
+                pytest.skip("测试数据库缺少虾标准食材")
+            rows = (
+                await conn.execute(
+                    sa.select(recipes.c.id, recipes.c.time_minutes, recipes.c.tools)
+                    .where(recipes.c.time_minutes.is_(None))
+                    .limit(1)
+                )
+            ).all()
+            assert rows, "time_minutes=NULL fixture row is required"
+            null_id = str(rows[0].id)
+            allowed_tools = await conn.scalar(
+                sa.select(recipes.c.id).where(recipes.c.tools.op("<@")(["炒锅"])).limit(1)
+            )
+            assert allowed_tools is not None
+            corpus = CardCorpus(await load_card_documents(conn))
+            if not corpus.doc_ids:
+                pytest.skip("测试数据库没有可用菜谱语料")
+            retriever = HybridRetriever(embedder=FixedVectorEmbedder([0.0] * 1024), corpus=corpus, engine=engine)
+            assert null_id not in await retriever._allowed_recipe_ids(HardFilters(max_time_minutes=30))
+            tools_statement = retriever._allowed_recipe_statement(HardFilters(tools_available=["炒锅"]))
+            tool_ids = {str(row.id) for row in (await conn.execute(tools_statement)).all()}
+            assert str(allowed_tools) in tool_ids
+    finally:
+        await engine.dispose()
+
+
+@requires_db
+async def test_retriever_applies_hard_filters_to_sql_universe() -> None:
+    engine = create_async_engine(get_settings().database_url)
+    try:
+        async with engine.connect() as conn:
+            corpus = CardCorpus(await load_card_documents(conn))
+        if not corpus.doc_ids:
+            pytest.skip("测试数据库没有可用菜谱语料")
+        retriever = HybridRetriever(embedder=FixedVectorEmbedder([0.0] * 1024), corpus=corpus, engine=engine)
+        filters = HardFilters(excluded_ingredients=["虾"])
+        allowed_ids = await retriever._allowed_recipe_ids(filters)
+        assert allowed_ids is not None
+        assert allowed_ids
+        candidates = await retriever.search("西红柿炒鸡蛋", filters=filters)
+        assert all(candidate.recipe_id in allowed_ids for candidate in candidates)
+        assert all(candidate.recipe_id in corpus.doc_ids for candidate in candidates)
     finally:
         await engine.dispose()
 

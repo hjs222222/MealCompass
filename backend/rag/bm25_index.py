@@ -32,12 +32,20 @@ class BM25Index:
     def __len__(self) -> int:
         return len(self._doc_ids)
 
-    def search(self, query_tokens: Sequence[str], top_n: int) -> list[tuple[str, float]]:
+    def search(
+        self, query_tokens: Sequence[str], top_n: int, allowed_ids: set[str] | None = None
+    ) -> list[tuple[str, float]]:
         if self._bm25 is None or not query_tokens or top_n <= 0:
+            return []
+        if allowed_ids is not None and not allowed_ids:
             return []
         scores = self._bm25.get_scores(list(query_tokens))
         ranked = sorted(
-            ((self._doc_ids[index], float(score)) for index, score in enumerate(scores) if score > 0),
+            (
+                (self._doc_ids[index], float(score))
+                for index, score in enumerate(scores)
+                if score > 0 and (allowed_ids is None or self._doc_ids[index] in allowed_ids)
+            ),
             key=lambda hit: hit[1],
             reverse=True,
         )

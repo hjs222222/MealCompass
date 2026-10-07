@@ -32,11 +32,6 @@
 - 原因：① 配置名参数是 `regconfig` 类型，传 varchar 不匹配；② SQLAlchemy 里 executemany 的 WHERE 绑定名不能撞列名 `id`（被保留）；且 embedding 是 pgvector 类型，需显式绑定类型。
 - 解决：`sa.cast(sa.literal("simple"), REGCONFIG)`；改绑 `step_id` + `.values(embedding=bindparam(..., type_=Vector(1024)))`。
 
-## 2026-10-07 T1.6 集成测试：pytest-asyncio 全局 engine 跨事件循环
-- 问题：集成测试用 `infra.db.get_engine()`（全局单例），报 `Event loop is closed` / 连接绑死旧 loop。
-- 原因：pytest-asyncio 每个测试一个事件循环，全局连接池里的连接绑死第一次使用的 loop。
-- 解决：集成测试各自 `create_async_engine(get_settings().database_url)`，用完 `engine.dispose()`；生产代码仍用单例。
-
 ## 2026-10-07 T1.8 集成测试：asyncpg 把 vector 列以字符串返回
 - 问题：`select e.embedding ...` 读回的值 `list()` 后变成字符列表 `['[','0',...]`，`cosine_distance` 绑定报 `could not convert string to float`。
 - 原因：asyncpg 未注册 pgvector 类型 codec，`vector` 列以字符串（`"[0.026,...]"`）返回；`list(字符串)` 按字符拆。
@@ -61,3 +56,11 @@
 - 问题：`ReversingRerank` 返回的 hits 不是按分数降序（index 越大分越低却排最前），导致断言「重排后第一位」失败两次。
 - 原因：生成列表时分数公式 `total - index` 让最后一个下标分最低，违反了 FallbackRerank「返回按分降序」的不变量；断言也因此反了。
 - 解决：改为 `index + 1`（原最后文档分最高、降序输出），并同步修正断言为「返回列表第一位 rank=1 且 rerank_score 最大」；`rag/reranker.py` 保持按 hits 顺序组装，契约是 hits 必须降序。
+
+## 2026-10-07 TODO 核对与同步 无失败记录
+
+## 2026-10-07 T1.13-T1.10-T1.11 检索闭环收尾
+- 问题：初版接口把数据库仓储和 LLM 方法写成同步函数；初版过滤测试遗漏了向量 Top50 与 BM25 独立召回、空语料伪通过等问题。
+- 原因：Protocol 的 runtime structural check 不会验证 async 性质；硬约束允许集合与召回通道边界需要单独测试；推荐模型也曾允许空白引用和重复候选 ID。
+- 解决：统一改为 async Protocol；先由 SQL 构造完整允许 recipe-id universe，再分别限制向量/BM25 通道；时间上限严格排除未知耗时；补充 SQL/单元/集成测试；Recommendation 与引用校验拒绝空白、未知、重复和冲突引用。
+

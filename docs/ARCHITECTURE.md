@@ -371,14 +371,18 @@ CREATE INDEX ON recipes USING gin(tags);
 ```python
 # domain/ports.py —— 所有 Protocol 集中在此文件
 class RecipeRepository(Protocol):
-    async def get(self, recipe_id: str) -> Recipe | None: ...
-    async def search(self, filters: dict, limit: int) -> list[Recipe]: ...
+    async def get_by_id(self, recipe_id: str) -> Recipe | None: ...
+    async def search(
+        self,
+        filters: HardFilters | None = None,
+        limit: int = 50,
+    ) -> list[Recipe]: ...
 
 class Retriever(Protocol):
     async def search(
         self,
         query: str,
-        filters: dict,          # 硬约束下推
+        filters: HardFilters | None = None,  # 硬约束下推
         top_k: int = 10,
     ) -> list[RecipeCandidate]: ...
 
@@ -395,8 +399,14 @@ async def run_agent(
 
 # domain/ports.py（实现：infra/llm_client.py）
 class LLMClient(Protocol):
-    async def chat(self, messages: list[Message], **kwargs) -> str: ...
-    async def structured(self, messages: list[Message], schema: type[BaseModel]) -> BaseModel: ...
+    model: str
+    async def complete(
+        self,
+        messages: Sequence[dict[str, str]],
+        *,
+        temperature: float = 0.1,
+        response_format: str | None = None,
+    ) -> str: ...
 
 class EmbeddingClient(Protocol):
     async def embed(self, texts: list[str]) -> list[list[float]]: ...
@@ -429,6 +439,7 @@ class RerankClient(Protocol):
 | v1.0 | 2026-10-07 | T1.6 落地：`rag/chunking.py` 双层切分（卡片=菜名+简介+食材 / 步骤=原文）+ `scripts/build_index.py`（embedding + tsv 入库，幂等可重跑）；`rag/tokenization.py` 统一 jieba 分词，tsv 用 `to_tsvector('simple')` | 双层索引是混合检索（T1.8）的落点；tsv 与 BM25 共用同一分词，词项一致 |
 | v1.1 | 2026-10-07 | T1.8 落地：`rag/retriever.py` HybridRetriever（向量 Top50 + BM25 Top50 → RRF → Top10）；`rag/corpus.py` CardCorpus 与向量共用同一卡片文档；`scripts/smoke_retrieval.py` 真查询冒烟 | 混合检索是 F-B3 的落点；BM25 语料与向量 embed 的是同一份文本，两个通道才可融合 |
 | v1.2 | 2026-10-07 | T1.9 落地：`rag/reranker.py` 重排编排（失败降级回 RRF 顺序并标记 degraded）；`HybridRetriever` 可选 `reranker` 参数；`smoke_retrieval --rerank` 真远程验证 | F-B4 重排落点；重排绝不能拖垮检索，降级是契约 |
+| v1.3 | 2026-10-07 | T1.11 推荐领域模型校验非空文本；引用校验拒绝重复候选 ID、名称冲突和小于 1 的推荐数量 | 确保推荐引用唯一、可展示且 reason 必填 |
 
 **迭代规则**：
 

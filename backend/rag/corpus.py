@@ -78,6 +78,6 @@ class CardCorpus:
         """卡片索引文本（菜名+简介+食材），重排时作为 query 的配对文档。"""
         return self._texts.get(doc_id)
 
-    def search(self, query: str, top_n: int) -> list[tuple[str, float]]:
-        """返回 ``[(recipe_id, bm25分)]``，按分降序。"""
-        return self._bm25.search(tokenize(query), top_n)
+    def search(self, query: str, top_n: int, allowed_ids: set[str] | None = None) -> list[tuple[str, float]]:
+        """返回 ``[(recipe_id, bm25分)]``，可限制在 SQL 产生的允许 ID 集合内。"""
+        return self._bm25.search(tokenize(query), top_n, allowed_ids)

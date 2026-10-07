@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field
 class HardFilters(BaseModel):
     """硬约束（T1.10）：**下推到检索层**，不允许检索后再过滤。
 
-    - ``max_time_minutes``：可接受的最长烹饪耗时（分钟）。上游 ``time_minutes``
-      目前恒为 NULL，该条件以「未知不拦截」为原则（见 `rag.retriever` 的 SQL）。
+    - ``max_time_minutes``：可接受的最长烹饪耗时（分钟）。有时间上限时仅允许
+      ``time_minutes`` 非 NULL 且不超过上限；未知耗时按严格安全语义排除，绝不编造上游耗时。
     - ``tools_available``：用户**拥有**的厨具；菜谱 ``tools`` 必须是它的子集。
     - ``excluded_ingredients``：忌口/过敏食材（标准名或别名都行，检索层负责同义展开）。
     """

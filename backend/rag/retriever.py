@@ -7,8 +7,7 @@
        └──────────── RRF 融合（k=60）──▶ Top-k 候选（RecipeCandidate，带真实 recipe_id）
 
 - 两个通道都只返回**排名**进 RRF，不混合原始分数（量纲不同）。
-- 硬约束下推（T1.10）尚未实现：传入非空 ``filters`` 会抛 ``NotImplementedError``，
-  契约先行（`domain/ports.py` 的 `Retriever`）。
+- 硬约束先构造 SQL 允许 recipe-id universe，再约束两个召回通道。
 - 可观测：整个检索记为一个 ``retriever`` 观察（`SpanName.RETRIEVE_RECIPES`），
   metadata 里带通道命中数与是否降级；embedding 降级状态从 ``last_provider`` 读取。
 """
@@ -19,12 +18,13 @@ from collections.abc import Sequence
 from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from domain.models.retrieval import HardFilters, RecipeCandidate
 from infra.db import get_engine
 from infra.observability import ObservationType, SpanName, traced
-from infra.tables import recipe_embeddings, recipes
+from infra.tables import ingredient_aliases, ingredients, recipe_embeddings, recipe_ingredients, recipes
 from rag.corpus import CardCorpus
 from rag.fusion import DEFAULT_RRF_K, reciprocal_rank_fusion
 from rag.reranker import rerank_candidates
@@ -69,18 +69,28 @@ class HybridRetriever:
         cleaned = (query or "").strip()
         if not cleaned:
             return []
-        if filters is not None and not filters.is_empty():
-            raise NotImplementedError("硬约束下推属 T1.10，尚未实现")
-
         with traced(
             SpanName.RETRIEVE_RECIPES,
             as_type=ObservationType.RETRIEVER,
-            input={"query": cleaned, "top_k": top_k},
+            input={
+                "query": cleaned,
+                "top_k": top_k,
+                "has_hard_filters": filters is not None and not filters.is_empty(),
+            },
         ) as span:
+            allowed_ids = await self._allowed_recipe_ids(filters)
+            if allowed_ids is not None and not allowed_ids:
+                span.update(
+                    output={"recipe_ids": [], "vector_hits": 0, "bm25_hits": 0, "reranked": False, "degraded": False}
+                )
+                return []
+
             query_vector = (await self._embedder.embed([cleaned]))[0]
 
-            vector_hits = await self._vector_search(query_vector)
-            bm25_hits = self._corpus.search(cleaned, self._bm25_top_n)
+            vector_hits = await self._vector_search(query_vector, allowed_ids)
+            # BM25 scores the small in-memory corpus first, then applies the SQL-derived
+            # allowed universe; it must not inherit the vector channel's Top-N boundary.
+            bm25_hits = self._corpus.search(cleaned, self._bm25_top_n, allowed_ids)
 
             fused = reciprocal_rank_fusion(
                 {
@@ -121,14 +131,65 @@ class HybridRetriever:
             )
             return candidates
 
-    async def _vector_search(self, query_vector: Sequence[float]) -> list[tuple[str, float]]:
-        """pgvector 余弦 Top-N（HNSW `vector_cosine_ops` 索引生效）。"""
+    def _allowed_recipe_statement(self, filters: HardFilters | None) -> sa.Select | None:
+        """Build the SQL statement defining the complete hard-filter recipe universe."""
+        if filters is None or filters.is_empty():
+            return None
+        conditions: list[Any] = []
+        if filters.max_time_minutes is not None:
+            # Strict safety: a time cap only admits recipes with known duration within the cap.
+            conditions.extend(
+                [
+                    recipes.c.time_minutes.is_not(None),
+                    recipes.c.time_minutes <= filters.max_time_minutes,
+                ]
+            )
+        if filters.tools_available:
+            available = sa.cast(filters.tools_available, JSONB)
+            conditions.append(recipes.c.tools.op("<@")(available))
+        for excluded in filters.excluded_ingredients:
+            # Match PostgreSQL lower(column) semantics; casefold can transform characters (e.g. ẞ -> ss)
+            # that lower() preserves differently, producing a false negative in the SQL predicate.
+            normalized = excluded.lower()
+            match = sa.or_(
+                sa.func.lower(ingredients.c.name) == normalized,
+                sa.func.lower(recipe_ingredients.c.name_raw) == normalized,
+                sa.func.lower(ingredient_aliases.c.alias) == normalized,
+            )
+            exists = (
+                sa.select(1)
+                .select_from(
+                    recipe_ingredients.join(
+                        ingredients, recipe_ingredients.c.ingredient_id == ingredients.c.id, isouter=True
+                    ).join(ingredient_aliases, ingredient_aliases.c.ingredient_id == ingredients.c.id, isouter=True)
+                )
+                .where(recipe_ingredients.c.recipe_id == recipes.c.id, match)
+                .exists()
+            )
+            conditions.append(~exists)
+        return sa.select(recipes.c.id).where(*conditions)
+
+    async def _allowed_recipe_ids(self, filters: HardFilters | None) -> set[str] | None:
+        """Build the SQL hard-filter universe; None preserves the legacy unfiltered path."""
+        statement = self._allowed_recipe_statement(filters)
+        if statement is None:
+            return None
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(statement)).all()
+        return {str(row.id) for row in rows}
+
+    async def _vector_search(
+        self, query_vector: Sequence[float], allowed_ids: set[str] | None = None
+    ) -> list[tuple[str, float]]:
+        """pgvector cosine Top-N, optionally restricted to the SQL-derived universe."""
         statement = (
             sa.select(recipes.c.id, recipe_embeddings.c.embedding.cosine_distance(query_vector).label("distance"))
             .join(recipes, recipes.c.id == recipe_embeddings.c.recipe_id)
             .order_by("distance")
             .limit(self._vector_top_n)
         )
+        if allowed_ids is not None:
+            statement = statement.where(recipes.c.id.in_(list(allowed_ids)))
         async with self._engine.connect() as conn:
             rows = (await conn.execute(statement)).all()
         return [(str(row.id), float(row.distance)) for row in rows]
