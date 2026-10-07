@@ -113,3 +113,113 @@ async def test_retriever_rejects_non_empty_filters_until_t1_10() -> None:
 async def test_retriever_empty_query_returns_empty() -> None:
     retriever = HybridRetriever(embedder=FixedVectorEmbedder([0.0] * 1024), corpus=CardCorpus([]))
     assert await retriever.search("   ") == []
+
+
+class ReversingRerank:
+    """把候选顺序倒过来，并记一次调用（验证重排步骤真实生效）。"""
+
+    def __init__(self) -> None:
+        self.last_provider = "remote"
+        self.calls = 0
+
+    async def rerank(self, query: str, documents: list[str], top_k: int = 10) -> list[tuple[int, float]]:
+        self.calls += 1
+        total = min(top_k, len(documents))
+        # 反序降序给分：原最后一个文档分最高 → 返回下标逆序、分数递减
+        return [(index, float(index + 1)) for index in range(total - 1, -1, -1)]
+
+
+@requires_db
+async def test_reranker_step_reorders_retrieval_results() -> None:
+    import sqlalchemy as sa
+
+    engine = create_async_engine(get_settings().database_url)
+    try:
+        async with engine.connect() as conn:
+            transaction = await conn.begin()
+            try:
+                recipe_id, name, raw_embedding = (
+                    await conn.execute(
+                        sa.text(
+                            "select r.id, r.name, e.embedding from recipes r "
+                            "join recipe_embeddings e on e.recipe_id = r.id "
+                            "order by length(r.name) desc limit 1"
+                        )
+                    )
+                ).one()
+                embedding = json.loads(raw_embedding) if isinstance(raw_embedding, str) else list(raw_embedding)
+
+                corpus = CardCorpus(await load_card_documents(conn))
+                reranker = ReversingRerank()
+                retriever = HybridRetriever(
+                    embedder=FixedVectorEmbedder(embedding),
+                    corpus=corpus,
+                    reranker=reranker,
+                    engine=engine,
+                )
+
+                candidates = await retriever.search(name, top_k=10)
+
+                assert reranker.calls == 1
+                assert 1 <= len(candidates) <= 10
+                # 重排后 rerank_score 已填、rank 严格 1..n
+                assert all(candidate.rerank_score is not None for candidate in candidates)
+                assert [candidate.rank for candidate in candidates] == list(range(1, len(candidates) + 1))
+                # ReversingRerank 按文档逆序给分：原最后一个候选被重排到第一位
+                assert candidates[0].rank == 1
+                assert candidates[0].rerank_score == max(candidate.rerank_score or 0 for candidate in candidates)
+                # provider=remote，未标记降级
+                assert not any(candidate.degraded for candidate in candidates)
+            finally:
+                await transaction.rollback()
+    finally:
+        await engine.dispose()
+
+
+@requires_db
+async def test_reranker_failure_falls_back_to_rrf_order() -> None:
+    import sqlalchemy as sa
+
+    engine = create_async_engine(get_settings().database_url)
+    try:
+        async with engine.connect() as conn:
+            transaction = await conn.begin()
+            try:
+                recipe_id, name, raw_embedding = (
+                    await conn.execute(
+                        sa.text(
+                            "select r.id, r.name, e.embedding from recipes r "
+                            "join recipe_embeddings e on e.recipe_id = r.id "
+                            "order by length(r.name) desc limit 1"
+                        )
+                    )
+                ).one()
+                embedding = json.loads(raw_embedding) if isinstance(raw_embedding, str) else list(raw_embedding)
+
+                corpus = CardCorpus(await load_card_documents(conn))
+
+                class BrokenRerank:
+                    last_provider = "remote"
+
+                    async def rerank(self, query: str, documents: list[str], top_k: int = 10):
+                        raise RuntimeError("remote down")
+
+                retriever = HybridRetriever(
+                    embedder=FixedVectorEmbedder(embedding),
+                    corpus=corpus,
+                    reranker=BrokenRerank(),
+                    engine=engine,
+                )
+                candidates = await retriever.search(name, top_k=10)
+
+                # 降级：候选按 RRF 原顺序返回，全部标记 degraded，rerank_score 为空
+                assert 1 <= len(candidates) <= 10
+                assert all(candidate.degraded for candidate in candidates)
+                assert all(candidate.rerank_score is None for candidate in candidates)
+                assert [candidate.rank for candidate in candidates] == list(range(1, len(candidates) + 1))
+                # 目标菜仍应在 Top5（RRF 原顺序，向量通道 Top1）
+                assert str(recipe_id) in [candidate.recipe_id for candidate in candidates[:5]]
+            finally:
+                await transaction.rollback()
+    finally:
+        await engine.dispose()

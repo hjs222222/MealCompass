@@ -59,11 +59,12 @@ async def load_card_documents(conn: AsyncConnection, limit: int | None = None) -
 
 
 class CardCorpus:
-    """内存 BM25 语料：doc_id → 菜名 + 分词后文档。"""
+    """内存 BM25 语料：doc_id → 菜名 + 卡片文本（供重排取原文）。"""
 
     def __init__(self, documents: list[CardDocument]) -> None:
         self._doc_ids = [str(document.key) for document in documents]
         self._names = {str(document.key): document.name for document in documents}
+        self._texts = {str(document.key): document.text for document in documents}
         self._bm25 = BM25Index(self._doc_ids, [tokenize(document.text) for document in documents])
 
     @property
@@ -72,6 +73,10 @@ class CardCorpus:
 
     def name_of(self, doc_id: str) -> str | None:
         return self._names.get(doc_id)
+
+    def text_of(self, doc_id: str) -> str | None:
+        """卡片索引文本（菜名+简介+食材），重排时作为 query 的配对文档。"""
+        return self._texts.get(doc_id)
 
     def search(self, query: str, top_n: int) -> list[tuple[str, float]]:
         """返回 ``[(recipe_id, bm25分)]``，按分降序。"""
