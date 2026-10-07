@@ -17,6 +17,8 @@
 
 ---
 
+## 2026-10-07 T1.15 无失败记录
+
 ## 2026-10-07 T1.6 全量建索引：PowerShell 把 jieba 的 SyntaxWarning 误判为失败
 - 问题：`python -m scripts.build_index` 实际跑完（372 卡片 + 3806 步骤全量入库），但 PowerShell 退出码 1，误导以为失败。
 - 原因：jieba 0.42 包内 regex 触发 Python 的 `SyntaxWarning`，走 stderr；PowerShell 把任何 stderr 输出当 `NativeCommandError`。
@@ -64,3 +66,7 @@
 - 原因：Protocol 的 runtime structural check 不会验证 async 性质；硬约束允许集合与召回通道边界需要单独测试；推荐模型也曾允许空白引用和重复候选 ID。
 - 解决：统一改为 async Protocol；先由 SQL 构造完整允许 recipe-id universe，再分别限制向量/BM25 通道；时间上限严格排除未知耗时；补充 SQL/单元/集成测试；Recommendation 与引用校验拒绝空白、未知、重复和冲突引用。
 
+## 2026-10-07 T1.14-T1.16 收尾：配置、日志与异常审查
+- 问题：最终审查发现 APP_VERSION 未进入模板，结构化日志会丢失 provider/degraded/operation 等字段，异常日志缺服务端 traceback，prod secret 与 middleware 异常路径缺少 context 生命周期验证。
+- 原因：早期实现只保留固定日志字段，配置和 lifespan 行为虽已实现但缺少 TestClient context 覆盖；日志扩展字段未定义安全序列化及敏感字段过滤契约。
+- 解决：新增 APP_VERSION 模板与配置覆盖测试；JsonFormatter 保留安全 extra 并过滤 secret/token 等字段、对不可 JSON 值使用 repr，异常日志写入 traceback；补 prod 启动成功/失败、OpenAPI 版本一致、request-id 与日志幂等测试，并同步架构与 TODO。

@@ -102,9 +102,9 @@
 
 ### 4.3 前后端骨架
 
-- [ ] **T1.14 FastAPI 入口与分层** `[MVP]`：`main.py` + `api/v1/*` 薄路由（≤10 行）+ `api/deps.py`；api 不直连 infra
-- [ ] **T1.15 配置外置** `[MVP]`：`core/config.py` 用 pydantic-settings 读 `.env`，dev/prod 分离
-- [ ] **T1.16 异常/日志** `[MVP]`：`core/exceptions.py`、`core/logging.py` 结构化日志
+- [X] **T1.14 FastAPI 入口与分层** `[MVP]`：`main.py` + `api/v1/*` 薄路由 + `api/deps.py`
+- [X] **T1.15 配置外置** `[MVP]`：`core/config.py` 用 pydantic-settings 读 `.env`，dev/prod 分离
+- [X] **T1.16 异常/日志** `[MVP]`：`core/exceptions.py`、`core/logging.py` 结构化日志
 - [ ] **T1.17 前端骨架** `[MVP]`：App Router + 路由组 `(auth)` / `(main)`，默认 Server Component
 - [ ] **T1.18 前端数据层** `[MVP]`：`lib/api.ts`、TanStack Query hooks、Zustand
 

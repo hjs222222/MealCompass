@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,7 +31,8 @@ class Settings(BaseSettings):
     )
 
     # ---- 应用 ----
-    app_env: str = Field(default="dev", description="dev / staging / prod")
+    app_env: Literal["dev", "staging", "prod"] = Field(default="dev", description="dev / staging / prod")
+    app_version: str = "0.1.0"
     log_level: str = "INFO"
 
     # ---- LLM（OpenAI 兼容）----
@@ -57,6 +59,11 @@ class Settings(BaseSettings):
 
     # ---- 安全 ----
     jwt_secret: str = "change-me-in-dev-only"
+
+    def validate_runtime(self) -> None:
+        """Validate settings that depend on the selected deployment environment."""
+        if self.app_env == "prod" and self.jwt_secret == "change-me-in-dev-only":
+            raise ValueError("JWT_SECRET must be explicitly configured in prod")
 
     @property
     def tracing_enabled(self) -> bool:

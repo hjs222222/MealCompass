@@ -44,7 +44,8 @@ data/recipes/*.json
 # 必须写成 /HowToCook/ 锚定仓库根：否则 Windows 大小写不敏感会连 data/raw/howtocook/ 一起忽略
 /HowToCook/
 
-# ===== 本地缓存 =====
+# 本地缓存
 .uvcache/
+jieba.cache
 # 本地兜底模型权重（HuggingFace / sentence-transformers），约 4.6 GB，绝不入库
 .cache/
