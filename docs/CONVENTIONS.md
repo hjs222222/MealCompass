@@ -259,6 +259,8 @@ graph = builder.compile(checkpointer=checkpointer)
 
 - 硬约束下推到检索层（SQL `WHERE` / 向量过滤），不在检索后过滤
 - 模型调用（Embedding / 重排）实行**远程优先、本地兜底**：默认走 OpenAI 兼容的远程接口，失败或离线时回落本地推理；调用方只依赖 `domain/ports.py` 的 Protocol，并在 trace metadata 里标注 provider 与是否降级
+- ⚠️ **本地兜底必须与远程用同一个模型**：向量空间不一致时，库里存的远程向量和本地查询向量没法比，索引直接作废。因此不能图省事换小模型（何况 `bge-small-zh` 是 512 维，与 `vector(1024)` 对不上）。改模型 = 全量重建索引
+- 本地模型缓存由 `infra/model_cache.py` 统一固定到 `<仓库>/.cache`（`HF_HOME` 与 `SENTENCE_TRANSFORMERS_HOME` **两个都要设**，只设一个会重复下载）
 - 生成必须引用 `recipe_id`，禁止编造知识库外内容
 - 反思校验失败重试 ≤ 2 次，仍失败降级返回安全候选
 - 温度参数设为 0.1 以减少幻觉
@@ -558,6 +560,7 @@ services:
 | v1.3 | 2026-10-06 | 补充食材归一化词典的存放位置与维护规则 | T1.3 落地，避免词表散落在代码里 |
 | v1.4 | 2026-10-06 | 补 Docker Compose（profile 用法）与 Alembic 建表流程；`alembic.ini` 必须 ASCII | T0.8/T0.9 落地 |
 | v1.5 | 2026-10-06 | 补「上游原文字段一律用 TEXT」的规则 | 实机入库踩到 VARCHAR(160) 溢出 |
+| v1.6 | 2026-10-07 | 新增「本地兜底必须同模型」「两个缓存变量都要设」两条规则 | 兜底的正确性前提，踩过重复下载 |
 
 **迭代规则**：
 

@@ -1,6 +1,4 @@
-cd D:\Allcode\MealCompass
-git add -A
-git commit -m "feat: T1.7 Embedding/Rerank 双通道（远程优先 SiliconFlow + 本地兜底）" -m "契约：domain/ports.py 定义 EmbeddingClient / RerankClient`n实现：infra/embedding_client.py 与 rerank_client.py —— Remote / Local / Fallback 三实现`n远程：SiliconFlow OpenAI 兼容，BAAI/bge-m3 输出 1024 维，bge-reranker-v2-m3 排序正确（真调用验证）`n降级：远程失败切本地并记录 provider/次数/原因，无本地则抛原始异常`n测试：112 passed（104 单测 + 8 集成，含 3 个真实远程调用）"# MealCompass 待办清单
+# MealCompass 待办清单
 
 > 文档来源：`README.md`、`docs/PRD.md`、`docs/TECH_STACK.md`、`docs/ARCHITECTURE.md`、`docs/CONVENTIONS.md`、`docs/UI_STYLE.md`
 > 更新：2026-10-06 ｜ 状态：**跨文档冲突已全部统一**（结论见 §1 与 §9）
@@ -94,6 +92,7 @@ git commit -m "feat: T1.7 Embedding/Rerank 双通道（远程优先 SiliconFlow 
 
 - [ ] **T1.6 双层切分** `[MVP]`：卡片级 + 步骤级分别索引；单条上下文 ≤ 模型窗口 60%（PRD F-B2）
 - [X] **T1.7 Embedding / Rerank 双通道**：`domain/ports.py`（Protocol）+ `infra/embedding_client.py` / `infra/rerank_client.py`（Remote SiliconFlow / Local sentence-transformers / Fallback）。**真连 SiliconFlow 验证**：`BAAI/bge-m3` 输出 1024 维、`bge-reranker-v2-m3` 把「西红柿炒鸡蛋」排在「红烧肉」之前；104 个单测 + 3 个真实集成测试通过
+  - 本地兜底已用**真模型**验证（T1.8 之前的空白补上）：本地/远程向量余弦 **0.9999**，降级后 `provider=local` 且向量仍是 1024 维；一键自查 `python -m scripts.check_model_clients`
 - [ ] **T1.8 混合检索** `[MVP]`：向量 Top50 + BM25(rank-bm25 + jieba) Top50 → RRF → Top10（PRD F-B3）
 - [ ] **T1.9 重排** `[MVP]`：bge-reranker-v2-m3，Top10 延迟 ≤ 500ms（PRD F-B4）
 - [ ] **T1.10 硬约束下推** `[MVP]`：时间/厨具/忌口下推到 SQL WHERE 或向量过滤，**禁止检索后再过滤**（PRD F-B5）

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import inspect
 import logging
 from collections.abc import Callable, Sequence
 from typing import Any
@@ -22,6 +23,7 @@ from typing import Any
 import httpx
 
 from core.config import Settings, get_settings
+from infra.model_cache import prepare_local_model_cache
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ def _load_cross_encoder(model: str, device: str | None) -> Any:
         raise RuntimeError(
             "本地重排不可用：未安装 sentence-transformers。需要本地兜底时执行：pip install sentence-transformers"
         )
+    prepare_local_model_cache()  # 缓存固定到仓库内，避免「下到 A、加载去 B 找」
     from sentence_transformers import CrossEncoder  # 惰性导入
 
     return CrossEncoder(model, device=device)
@@ -117,7 +120,8 @@ class LocalRerank:
         if self._encoder is None:
             if self._loader is None:
                 self._encoder = _load_cross_encoder(self.model, self._device)
-            elif callable(self._loader):
+            elif inspect.isclass(self._loader) or inspect.isroutine(self._loader):
+                # 只有类/函数才算工厂；已实例化的模型对象（CrossEncoder 是 nn.Module）不能调用
                 self._encoder = self._loader()
             else:
                 self._encoder = self._loader

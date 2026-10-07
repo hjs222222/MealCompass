@@ -139,6 +139,7 @@ pnpm typecheck && pnpm lint && pnpm build
 | 加/改领域模型    | `backend/domain/models/` + `docs/ARCHITECTURE.md` §3.1                                                          |
 | 加可观测埋点     | `backend/infra/observability.py` 的 `SpanName` + `docs/CONVENTIONS.md` §4.5                                   |
 | 改 Embedding / Rerank | `backend/domain/ports.py`（契约）+ `backend/infra/embedding_client.py` / `rerank_client.py`；远程走 SiliconFlow，本地兜底可选 |
+| 本地模型（兜底） | 下载：`python -m scripts.download_local_models`；自查：`python -m scripts.check_model_clients`；缓存固定在 `<仓库>/.cache`（见 `infra/model_cache.py`） |
 | 加/改食材词表 | `data/ingredients/aliases.yaml` + `backend/domain/ingredients.py` + `import_report.json` 的 `unmapped_top`   |
 | 加规则           | `data/rules/*.yaml` + `backend/domain/rules/` + `docs/PRD.md` 模块 D                                           |
 | 查 Langfuse 数据 | 用`langfuse` 技能；读取走 **Observations API v2**（旧 `/api/public/traces` 对本组织返回 410）              |

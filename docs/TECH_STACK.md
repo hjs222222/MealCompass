@@ -149,6 +149,17 @@ backend/
 
 已落地：`infra/embedding_client.py` 与 `infra/rerank_client.py` —— `Remote*`（远程）/ `Local*`（sentence-transformers，可选）/ `Fallback*`（降级组合）；调用方只依赖 `domain/ports.py` 的 Protocol。远程走不通时自动切本地，并把 provider 与降级次数暴露给 trace。
 
+**本地兜底已用真模型验证（2026-10-07）**：`BAAI/bge-m3` 与 `BAAI/bge-reranker-v2-m3` 各约 2.2 GB（跳过 2 GB 的 onnx 导出），落在 `<仓库>/.cache/`（已 gitignore）。
+
+| 检查项 | 实测 |
+| --- | --- |
+| 本地 embedding 维度 | 1024（与 `vector(1024)` 对齐） |
+| 本地 rerank 排序 | 番茄炒蛋 →「西红柿炒鸡蛋」0.9961 / 「红烧肉」0.0026 |
+| **本地 vs 远程向量余弦相似度** | **0.9999**（同模型、同向量空间，混用不毁索引） |
+| 降级链路 | 远程打不通 → `provider=local`，兜底向量仍是 1024 维 |
+
+一键自查：`python -m scripts.check_model_clients`（4 项断言）。
+
 > 不选 `Qwen/Qwen3-Embedding-*` 的原因：维度与既有的 `vector(1024)` 不匹配，换维度要重建索引与迁移，收益不抵成本。
 - LLM 通过 API 调用，保留 `LLMClient` 抽象层，便于切换
 - 单次推荐 Token 成本 ≤ ¥0.05

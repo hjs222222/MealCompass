@@ -46,3 +46,5 @@ data/recipes/*.json
 
 # ===== 本地缓存 =====
 .uvcache/
+# 本地兜底模型权重（HuggingFace / sentence-transformers），约 4.6 GB，绝不入库
+.cache/

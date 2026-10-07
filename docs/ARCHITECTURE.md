@@ -425,6 +425,7 @@ class RerankClient(Protocol):
 | v0.6 | 2026-10-06 | 落库实现：`infra/tables.py`（12 张表）+ Alembic `0001_initial_schema`；§3.1 补实现要点 | 数据齐了要进库，检索/规则才有落点 |
 | v0.7 | 2026-10-06 | 迁移 0002：`servings_text` / `amount_text` 放宽为 TEXT；`slug` 改由 `source_path` 派生 | 实机入库暴露的两个真问题：原文超长、同名菜谱 slug 冲突 |
 | v0.8 | 2026-10-07 | 落地 `domain/ports.py` 的 EmbeddingClient / RerankClient 与 `infra/` 的 Remote / Local / Fallback 三实现 | T1.7：模型调用要远程优先、本地兜底且可观测 |
+| v0.9 | 2026-10-07 | 新增 `infra/model_cache.py`（模型缓存固定到仓库内）；本地兜底用真模型验证（本地/远程余弦 0.9999） | 缓存路径不一致会白下 4.4 GB；本地兜底必须证明与远程同空间 |
 
 **迭代规则**：
 
