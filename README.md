@@ -177,7 +177,7 @@ cd backend && .venv/Scripts/python.exe -m alembic upgrade head && cd ..
 cd backend
 .venv/Scripts/python.exe -m scripts.import_howtocook   # HowToCook markdown -> JSON
 .venv/Scripts/python.exe -m scripts.seed_recipes        # JSON + 食材词典 -> PostgreSQL
-.venv/Scripts/python.exe -m scripts.build_index.py      # 建向量索引（T1.6 落地后）
+.venv/Scripts/python.exe -m scripts.build_index         # 建双层向量索引（T1.6，幂等可重跑）
 cd ..
 ```
 

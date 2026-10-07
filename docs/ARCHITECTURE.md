@@ -426,6 +426,7 @@ class RerankClient(Protocol):
 | v0.7 | 2026-10-06 | 迁移 0002：`servings_text` / `amount_text` 放宽为 TEXT；`slug` 改由 `source_path` 派生 | 实机入库暴露的两个真问题：原文超长、同名菜谱 slug 冲突 |
 | v0.8 | 2026-10-07 | 落地 `domain/ports.py` 的 EmbeddingClient / RerankClient 与 `infra/` 的 Remote / Local / Fallback 三实现 | T1.7：模型调用要远程优先、本地兜底且可观测 |
 | v0.9 | 2026-10-07 | 新增 `infra/model_cache.py`（模型缓存固定到仓库内）；本地兜底用真模型验证（本地/远程余弦 0.9999） | 缓存路径不一致会白下 4.4 GB；本地兜底必须证明与远程同空间 |
+| v1.0 | 2026-10-07 | T1.6 落地：`rag/chunking.py` 双层切分（卡片=菜名+简介+食材 / 步骤=原文）+ `scripts/build_index.py`（embedding + tsv 入库，幂等可重跑）；`rag/tokenization.py` 统一 jieba 分词，tsv 用 `to_tsvector('simple')` | 双层索引是混合检索（T1.8）的落点；tsv 与 BM25 共用同一分词，词项一致 |
 
 **迭代规则**：
 
