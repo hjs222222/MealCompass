@@ -220,8 +220,9 @@ pnpm dev
 | `LANGFUSE_SECRET_KEY` | Langfuse 私钥     | —                                                            |
 | `SENTRY_DSN` | 异常上报（可选） | — |
 | `JWT_SECRET`          | JWT 密钥          | —                                                            |
+| `NEXT_PUBLIC_API_BASE_URL` | 前端访问的后端基址（唯一暴露给浏览器的变量） | `http://localhost:8000`（默认值，可留空） |
 
-> 完整变量见 `.env.example`。
+> 完整变量见 `.env.example`（前端为 `frontend/.env.example`）。
 
 ## 📊 评估指标
 
@@ -248,13 +249,12 @@ docker compose exec backend python scripts/eval.py
 cd backend
 uv run pytest --cov=.
 
-# 前端类型检查
+# 前端：类型检查 + Lint + 构建
 cd frontend
-pnpm typecheck
+pnpm typecheck && pnpm lint && pnpm build
 
-# Lint
-uv run ruff check .
-pnpm lint
+# 后端 Lint
+uv run ruff check . && uv run ruff format --check .
 ```
 
 ## 📚 文档索引
@@ -268,6 +268,7 @@ pnpm lint
 | [`docs/UI_STYLE.md`](./docs/UI_STYLE.md) | 前端 UI 风格（Natural Organic） |
 | [`docs/API.md`](./docs/API.md) | API 文档（由 FastAPI OpenAPI 自动生成） |
 | [`TODO.md`](./TODO.md) | 待办与排期（决策项 / 里程碑 / 验收标准） |
+| [`docs/failed-features.md`](./docs/failed-features.md) | 未完成功能与环境受限项登记（不假装可用） |
 
 ## 🗺️ 路线图
 

@@ -1,7 +1,7 @@
 # MealCompass 待办清单
 
 > 文档来源：`README.md`、`docs/PRD.md`、`docs/TECH_STACK.md`、`docs/ARCHITECTURE.md`、`docs/CONVENTIONS.md`、`docs/UI_STYLE.md`
-> 更新：2026-10-06 ｜ 状态：**跨文档冲突已全部统一**（结论见 §1 与 §9）
+> 更新：2026-10-09 ｜ 状态：**跨文档冲突已全部统一**（结论见 §1 与 §9）；M1 前后端骨架（T1.17/T1.18）已完成
 > 标记：`[MVP]` 必须做 ｜ `[P1]` 时间允许必做 ｜ `[P2]` 写入「未来工作」
 
 ---
@@ -105,8 +105,9 @@
 - [X] **T1.14 FastAPI 入口与分层** `[MVP]`：`main.py` + `api/v1/*` 薄路由 + `api/deps.py`
 - [X] **T1.15 配置外置** `[MVP]`：`core/config.py` 用 pydantic-settings 读 `.env`，dev/prod 分离
 - [X] **T1.16 异常/日志** `[MVP]`：`core/exceptions.py`、`core/logging.py` 结构化日志
-- [ ] **T1.17 前端骨架** `[MVP]`：App Router + 路由组 `(auth)` / `(main)`，默认 Server Component
-- [ ] **T1.18 前端数据层** `[MVP]`：`lib/api.ts`、TanStack Query hooks、Zustand
+- [X] **T1.17 前端骨架** `[MVP]`：`frontend/` 落地（Next.js 14 App Router，不带 `src/`）。路由组 `(auth)/login` + `(main)/dashboard`，另有 `/`、`loading.tsx`、`error.tsx`；`app/layout.tsx` 保持 Server Component，`components/providers.tsx` 是唯一客户端边界；Natural Organic token 写在 `app/globals.css` 的 `@theme`（不生成 `tailwind.config.js`）。**`pnpm typecheck && pnpm lint && pnpm build` 三项 exit 0**，4 条路由全部预渲染；`pnpm start` 后 `/`、`/dashboard`、`/login` 实测 HTTP 200
+- [X] **T1.18 前端数据层** `[MVP]`：`lib/api.ts`（`fetchHealth` / `fetchVersion` + `ApiError`，字段用类型守卫校验、8s 超时、错误消息不泄露响应体）、`lib/query-client.ts`、`lib/hooks/use-system-status.ts`（TanStack Query）、`lib/stores/ui.ts`（Zustand 只存 UI 状态）、`components/status-panel.tsx`（加载 / 错误 / 重试 / 紧凑模式）。**已真启动 FastAPI 验证契约**：`/health`、`/version` 字段与类型逐项一致；`api.ts` 编译产物对真实后端跑通「正常 / 网络不可达 / 非 2xx」三条路径
+- [ ] **T1.17b 前端自动化测试基线** `[P1]`：0 个前端测试，`lib/api.ts` 与 `StatusPanel` 的状态分支没有回归保护。**前置：先定测试框架选型**（`TECH_STACK` 未列前端测试框架）。详见 `docs/failed-features.md` F5/F6
 
 ### 4.4 M1 验收
 

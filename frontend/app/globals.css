@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/*
+ * Natural Organic 设计 token（唯一事实源：docs/UI_STYLE.md）
+ * Tailwind v4 CSS-first：token 定义在这里，不生成 tailwind.config.js。
+ */
+@theme {
+  /* 调色板：暖白背景 + 石棕主色 + 鼠尾草绿强调 + 暖褐辅助 */
+  --color-background: #faf6f1;
+  --color-surface: #ffffff;
+  --color-primary: #5c4033;
+  --color-accent: #8b9d77;
+  --color-secondary: #d4a373;
+  --color-foreground: #3d2c22;
+  --color-muted: #6b5a4e;
+  --color-line: #e7ddd2;
+
+  /* 字体：标题衬线（中文用思源宋体），正文系统无衬线；不引入 Inter/Roboto/Geist */
+  --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", ui-serif, Georgia, serif;
+  --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* 有机形状：卡片一律 2rem */
+  --radius-blob: 2rem;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: #faf6f1;
+    color: #3d2c22;
+  }
+
+  /* 键盘可达：统一可见焦点环 */
+  :focus-visible {
+    outline: 2px solid #8b9d77;
+    outline-offset: 2px;
+  }
+}
+
+/* 纸张/织物纹理：UI_STYLE 明确要求（CSS 实现），极低对比度、不使用冷色 */
+@utility paper-texture {
+  background-image: radial-gradient(#5c4033 0.4px, transparent 0.4px);
+  background-size: 12px 12px;
+  background-repeat: repeat;
+}

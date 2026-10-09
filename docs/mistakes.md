@@ -70,3 +70,19 @@
 - 问题：最终审查发现 APP_VERSION 未进入模板，结构化日志会丢失 provider/degraded/operation 等字段，异常日志缺服务端 traceback，prod secret 与 middleware 异常路径缺少 context 生命周期验证。
 - 原因：早期实现只保留固定日志字段，配置和 lifespan 行为虽已实现但缺少 TestClient context 覆盖；日志扩展字段未定义安全序列化及敏感字段过滤契约。
 - 解决：新增 APP_VERSION 模板与配置覆盖测试；JsonFormatter 保留安全 extra 并过滤 secret/token 等字段、对不可 JSON 值使用 repr，异常日志写入 traceback；补 prod 启动成功/失败、OpenAPI 版本一致、request-id 与日志幂等测试，并同步架构与 TODO。
+
+## 2026-10-09 T1.17 pnpm install 在链接阶段崩在 ERR_PNPM_SYMLINK_FAILED
+- 问题：`pnpm install` 跑到 `added 338` 后报 `ERR_PNPM_SYMLINK_FAILED Maximum call stack size exceeded`，没有生成 `pnpm-lock.yaml`，`node_modules` 只有残缺的 `.pnpm/`。
+- 原因：pnpm 默认用符号链接 + 虚拟 store 的隔离布局；本机 Windows 环境下该布局创建链接时触发 pnpm 内部的栈溢出。与镜像源、磁盘、路径重解析点都无关（已排查：项目无 junction，npmmirror 可达）。
+- 解决：`frontend/.npmrc` 固定 `node-linker=hoisted`（铺平 `node_modules`、不建符号链接），安装 396 个包成功且可复现。代价是失去 pnpm 的严格依赖隔离（幽灵依赖不再报错），属可接受的取舍。
+
+## 2026-10-09 T1.17 next build 抛 spawn EPERM，构建直接失败
+- 问题：`pnpm build` 在 "Creating an optimized production build ..." 后立刻 `Error: spawn EPERM`，栈顶是 `jest-worker` 的 `ChildProcessWorker.initialize → child_process.fork`。
+- 原因：沙箱禁止创建带 IPC 具名管道的子进程，而 Next 构建用 `child_process.fork` 起 worker。给 `next/dist/lib/worker.js` 注入探针后定位到根因有两个：webpack 编译 worker（`build/webpack-build/impl.js`）**根本没读** `experimental.workerThreads`；静态生成 worker 才读。单加 `workerThreads: true` 不够。
+- 解决：`next.config.mjs` 设 `experimental.workerThreads: true`（静态生成走线程，实测 `Worker` 构造成功、不再 EPERM）+ `experimental.webpackBuildWorker: false`（webpack 回主进程编译）。构建成功、4 条路由预渲染；代价是构建并行度下降（本项目规模无感）。另实测 `worker_threads` 在本沙箱可用，排除"线程也被禁"的假设。
+
+## 2026-10-09 T1.17 next/core-web-vitals 不注册 @typescript-eslint，自定义规则直接报错
+- 问题：`.eslintrc.json` 里写 `"@typescript-eslint/no-explicit-any": "error"`，`pnpm lint` 对**每个**文件报 `Definition for rule '@typescript-eslint/no-explicit-any' was not found`。
+- 原因：`eslint-config-next@14` 只加载 `@typescript-eslint/parser`，不注册 `@typescript-eslint` 插件；引用其规则名必然失败。而且显式声明该插件会引入 `TECH_STACK` 清单外的依赖。
+- 解决：改用 ESLint 核心能力——`no-restricted-syntax` 配选择器 `TSAnyKeyword` 阻断 `any`，`no-warning-comments` 配 `terms: ["@ts-ignore"]` 阻断忽略指令。中间还试过用 `LineComment[value=/@ts-ignore/]` 选择器，实测不生效（esquery 不匹配注释节点），已弃用。两条规则都用临时探针文件实测确认会报错，不是静默失效。
+

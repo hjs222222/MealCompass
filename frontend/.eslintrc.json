@@ -1,0 +1,14 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-warning-comments": ["error", { "terms": ["@ts-ignore"], "location": "anywhere" }],
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "TSAnyKeyword",
+        "message": "禁止 any（CONVENTIONS §3.1）：改用 unknown 或具体类型。"
+      }
+    ]
+  }
+}
