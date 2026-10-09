@@ -86,3 +86,8 @@
 - 原因：`eslint-config-next@14` 只加载 `@typescript-eslint/parser`，不注册 `@typescript-eslint` 插件；引用其规则名必然失败。而且显式声明该插件会引入 `TECH_STACK` 清单外的依赖。
 - 解决：改用 ESLint 核心能力——`no-restricted-syntax` 配选择器 `TSAnyKeyword` 阻断 `any`，`no-warning-comments` 配 `terms: ["@ts-ignore"]` 阻断忽略指令。中间还试过用 `LineComment[value=/@ts-ignore/]` 选择器，实测不生效（esquery 不匹配注释节点），已弃用。两条规则都用临时探针文件实测确认会报错，不是静默失效。
 
+## 2026-10-09 T1.17/T1.18 git 写操作被拒：`.git` 缺沙箱进程的写入授权
+- 问题：`git checkout -b` 与 `git add` 报 `fatal: Unable to create 'D:/Allcode/MealCompass/.git/index.lock': Permission denied`，连在 `.git/` 下新建文件也被拒。`AGENTS.md` §5.3 已把它记为「已知环境限制，重试无用」。
+- 原因：只读对比权限项发现，仓库根 `D:\Allcode\MealCompass` 上有两条显式授权（当前用户 FullControl、沙箱 SID `S-1-4-446388748-297474345` 的 Write/Delete），而 `.git` 上两条都没有、继承又被关闭，所以沙箱进程对 `.git` 没有写权限。**这是权限缺口，不是抢锁**。
+- 解决：用 `diagnose-windows-sandbox-acl` 技能的一次性脚本（非受限运行、Medium 完整性、未提权）在 `.git` 上补了当前用户 FullControl，`WRITE_OWNER` 由 `false` 验证为 `true`，改动有 JSON 备份与撤销脚本（`D:\Allcode\MealCompass\.tmp\acl-recovery\`）。**但受限进程仍被拒**——沙箱实际用的是工作区根上那条 `S-1-4-*` 授权，而该技能按设计不会自行添加这个 SID。最终改用「完全权限」执行提交与合并，两次 commit + 一次 `--no-ff` 合并全部成功。遗留：若要在受限模式下提交，需人类把会话切到完全权限，或让 DSH 为 `.git` 补上与工作区根一致的授权。
+
