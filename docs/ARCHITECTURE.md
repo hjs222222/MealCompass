@@ -129,6 +129,12 @@ mealcompass/
 └── README.md
 ```
 
+> **前端落地进度（2026-10-09，T1.17/T1.18）**：上面的 `frontend/` 是**目标**结构，当前只落了骨架与数据层：
+> `app/{layout,page,loading,error}.tsx`、`app/(auth)/login/`、`app/(main)/dashboard/`、`components/{providers,status-panel}.tsx`、`lib/api.ts`、`lib/query-client.ts`、`lib/hooks/`、`lib/stores/`。
+> 尚未创建：`recommend` / `chat` / `recipe` / `cook` / `shopping` / `history` / `profile` / `onboarding` / `legal` 页面，以及 `components/ui/`（shadcn/ui）。未完成项登记在 `docs/failed-features.md`。
+>
+> **前端边界契约**：`app/layout.tsx` 保持 Server Component；`components/providers.tsx` 是唯一客户端 Provider 边界（QueryClientProvider）。服务端状态只走 TanStack Query（`lib/hooks/`），客户端 UI 状态只走 Zustand（`lib/stores/`），两者不混。`lib/api.ts` 是唯一 HTTP 出口，错误统一归一化为 `ApiError`。
+
 **分层依赖方向（单向，不可逆）**：
 
 ```
@@ -440,6 +446,7 @@ class RerankClient(Protocol):
 | v1.1 | 2026-10-07 | T1.8 落地：`rag/retriever.py` HybridRetriever（向量 Top50 + BM25 Top50 → RRF → Top10）；`rag/corpus.py` CardCorpus 与向量共用同一卡片文档；`scripts/smoke_retrieval.py` 真查询冒烟 | 混合检索是 F-B3 的落点；BM25 语料与向量 embed 的是同一份文本，两个通道才可融合 |
 | v1.2 | 2026-10-07 | T1.9 落地：`rag/reranker.py` 重排编排（失败降级回 RRF 顺序并标记 degraded）；`HybridRetriever` 可选 `reranker` 参数；`smoke_retrieval --rerank` 真远程验证 | F-B4 重排落点；重排绝不能拖垮检索，降级是契约 |
 | v1.4 | 2026-10-07 | T1.14-T1.16 收尾：FastAPI lifespan 校验 prod secret，`APP_VERSION` 统一 `/version` 与 OpenAPI；request-id middleware 与 JSON 日志保留安全扩展字段、服务端 traceback | 配置/异常/日志契约需可验证，敏感信息不得进入响应或日志 |
+| v1.5 | 2026-10-09 | T1.17/T1.18 落地 `frontend/`：App Router 骨架 + `(auth)`/`(main)` 路由组（layout 保持 Server Component，Providers 是唯一客户端边界）；Natural Organic token 进 `app/globals.css` 的 `@theme`；数据层 `lib/api.ts`（类型守卫 + `ApiError`）+ `lib/hooks/`（TanStack Query）+ `lib/stores/`（Zustand）+ `status-panel`（加载/错误/重试） | 前后端骨架是 M1 验收落点；服务端状态与客户端状态必须分离，HTTP 错误必须归一化 |
 
 **迭代规则**：
 

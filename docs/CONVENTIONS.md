@@ -167,6 +167,7 @@ ignore = []
 - 禁止 `// @ts-ignore`，必须解决类型错误
 - 减少 `as` 断言，优先类型守卫
 - `strictNullChecks` 是最有价值的选项，强制处理 null/undefined
+- **落地方式（T1.17 实测）**：前两条由 `frontend/.eslintrc.json` 用 **ESLint 核心规则**强制——`no-restricted-syntax`（选择器 `TSAnyKeyword`）拦 `any`，`no-warning-comments`（terms `["@ts-ignore"]`）拦忽略指令。原因是 `eslint-config-next@14` 只加载 `@typescript-eslint/parser`、**不注册** `@typescript-eslint` 插件，写 `@typescript-eslint/*` 规则名会让 `pnpm lint` 对每个文件报 `Definition for rule ... was not found`；为这两条规则新增插件依赖也不划算。两条规则均已用探针文件实测会报错，不是静默失效。
 
 ### 3.2 Next.js App Router
 
@@ -563,6 +564,7 @@ services:
 | v1.5 | 2026-10-06 | 补「上游原文字段一律用 TEXT」的规则 | 实机入库踩到 VARCHAR(160) 溢出 |
 | v1.6 | 2026-10-07 | 新增「本地兜底必须同模型」「两个缓存变量都要设」两条规则 | 兜底的正确性前提，踩过重复下载 |
 | v1.7 | 2026-10-07 | 新增「tsv 与 BM25 共用同一 jieba 分词」规则 | T1.6 落地，避免库里词项与检索词项不一致 |
+| v1.8 | 2026-10-09 | §3.1 补「禁 `any` / 禁 `@ts-ignore`」的落地方式（ESLint 核心规则，不用 `@typescript-eslint/*`） | T1.17 实测：`eslint-config-next@14` 不注册该插件，写其规则名会让 lint 全线报错 |
 
 **迭代规则**：
 
