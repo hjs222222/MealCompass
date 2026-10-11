@@ -1,0 +1,252 @@
+# MealCompass 检索评估集（C2 / task-3）
+#
+# 约束（硬性）：
+#   1. 每条 `relevant` 只能是 **库里真实存在的 recipes.name**（先导出全表再人工构造）；
+#      校验命令：`python -m scripts.eval --validate-only`
+#   2. 每条 1-3 个 relevant，宁少不编。
+#   3. 40 条 = 5 类 × 8 条：direct(直接菜名) / ingredients(食材组合) / scene(场景耗时)
+#      / taste(口味菜系) / tool(工具做法)。
+#
+# 评估协议（见 backend/scripts/eval.py）：
+#   - 三组模式候选池统一 Top50，指标在 Top5 / Top10 上截断计算，保证横向可比。
+#   - relevant 用菜名匹配；库里 `陈皮排骨汤` 有两条同名记录，评估集刻意不收录该菜名。
+
+- id: q001
+  category: direct
+  query: "西红柿炒鸡蛋怎么做才好吃"
+  relevant: ["西红柿炒鸡蛋"]
+  notes: "直接点名菜名；库中同名唯一条目，最基础的词汇匹配验收点。"
+
+- id: q002
+  category: direct
+  query: "宫保鸡丁"
+  relevant: ["宫保鸡丁"]
+  notes: "川味名菜直接检索；糊辣荔枝味的描述在卡片文档里，向量与 BM25 都应命中。"
+
+- id: q003
+  category: direct
+  query: "可乐鸡翅的家常做法"
+  relevant: ["可乐鸡翅"]
+  notes: "菜名即做法关键（可乐入菜）；避免与红烧鸡翅、烤鸡翅混淆。"
+
+- id: q004
+  category: direct
+  query: "麻婆豆腐"
+  relevant: ["麻婆豆腐"]
+  notes: "菜名直接检索；注意库中还有家常日本豆腐、脆皮豆腐等干扰项。"
+
+- id: q005
+  category: direct
+  query: "地三鲜的做法"
+  relevant: ["地三鲜"]
+  notes: "东北经典菜名；干扰项为茄子炖土豆、红烧茄子等茄子类菜品。"
+
+- id: q006
+  category: direct
+  query: "糖醋排骨"
+  relevant: ["糖醋排骨"]
+  notes: "同名唯一；干扰项为糖醋里脊、糖醋鲤鱼（同类味型不同主料）。"
+
+- id: q007
+  category: direct
+  query: "蒜蓉虾怎么做好吃"
+  relevant: ["蒜蓉虾"]
+  notes: "粤式蒸虾；干扰项为蒜香黄油虾、芥末罗氏虾等虾类菜品。"
+
+- id: q008
+  category: direct
+  query: "玉米排骨汤"
+  relevant: ["玉米排骨汤"]
+  notes: "同名唯一；干扰项为排骨山药玉米汤（同食材不同汤品）。"
+
+- id: q009
+  category: ingredients
+  query: "家里只剩鸡蛋和番茄，能做什么菜"
+  relevant: ["西红柿炒鸡蛋", "西红柿鸡蛋汤", "西红柿鸡蛋挂面"]
+  notes: "鸡蛋+番茄的三种主食/汤/菜形态：炒菜、汤、挂面；库中这 3 道主料完全吻合。"
+
+- id: q010
+  category: ingredients
+  query: "有土豆和牛肉，想炖一锅"
+  relevant: ["西红柿土豆炖牛肉", "罗宋汤"]
+  notes: "库中同时含土豆与牛肉的炖菜只有这两道（罗宋汤为海派改良版，含土豆牛肉番茄）。"
+
+- id: q011
+  category: ingredients
+  query: "冰箱里有虾，想用大蒜炒一盘"
+  relevant: ["蒜蓉虾", "蒜香黄油虾"]
+  notes: "虾+大蒜组合的两道代表：中式蒸虾与西式黄油煎虾。"
+
+- id: q012
+  category: ingredients
+  query: "有排骨和玉米，想煲个汤"
+  relevant: ["玉米排骨汤", "排骨山药玉米汤"]
+  notes: "库中同时含排骨与玉米的汤品只有这两道。"
+
+- id: q013
+  category: ingredients
+  query: "有韭菜和鸡蛋，想做得简单点"
+  relevant: ["韭菜炒蛋", "韭菜盒子"]
+  notes: "韭菜+鸡蛋的两种做法：快手小炒与面点；库中仅这两道主料吻合。"
+
+- id: q014
+  category: ingredients
+  query: "买了牛腩和白萝卜"
+  relevant: ["广式萝卜牛腩"]
+  notes: "库中唯一同时含牛腩与萝卜的菜品；柱候牛腩无萝卜，不纳入。"
+
+- id: q015
+  category: ingredients
+  query: "有豆腐和金针菇"
+  relevant: ["金针菇日本豆腐煲"]
+  notes: "唯一同时含豆腐与金针菇的菜品；金针菇汤不含豆腐。"
+
+- id: q016
+  category: ingredients
+  query: "有肥牛片，想配米饭吃"
+  relevant: ["日式肥牛丼饭", "咖喱肥牛"]
+  notes: "库中含肥牛且适合配饭的两道；炒意大利面同为肥牛菜但形态是意面，不纳入。"
+
+- id: q017
+  category: scene
+  query: "十五分钟就能做好的快手菜"
+  relevant: ["白灼虾", "蒜蓉虾", "西红柿炒鸡蛋"]
+  notes: "三道菜简介原文均写明约 15 分钟完成，是耗时场景的锚点。"
+
+- id: q018
+  category: scene
+  query: "二十分钟左右能做好的家常菜"
+  relevant: ["酸辣土豆丝", "手撕包菜", "上汤娃娃菜"]
+  notes: "三道简介均写 20 分钟；比 15 分钟档稍慢一档，检验语义相近耗时的区分度。"
+
+- id: q019
+  category: scene
+  query: "十分钟以内搞定的下饭菜"
+  relevant: ["洋葱炒鸡蛋", "炒滑蛋", "皮蛋豆腐"]
+  notes: "简介分别写 5 分钟 / 5 分钟 / 5 分钟，属最快一档。"
+
+- id: q020
+  category: scene
+  query: "早上赶时间，五分钟能吃完的早餐"
+  relevant: ["吐司果酱", "太阳蛋", "微波炉荷包蛋"]
+  notes: "三道微波/免开火早餐，简介原文分别写 2 分钟 / 3 分钟 / 2 分钟。"
+
+- id: q021
+  category: scene
+  query: "想喝口热汤，二十分钟内能好"
+  relevant: ["紫菜蛋花汤", "西红柿鸡蛋汤", "金针菇汤"]
+  notes: "简介分别写 20 / 15 / 10 分钟的简易汤品。"
+
+- id: q022
+  category: scene
+  query: "周末有空，想慢慢炖一锅肉"
+  relevant: ["老妈蹄花", "萝卜炖羊排", "土豆炖排骨"]
+  notes: "均为需要 1.5-2 小时慢炖的硬菜，检验长耗时段落的召回。"
+
+- id: q023
+  category: scene
+  query: "朋友聚餐，想做一大锅硬菜"
+  relevant: ["新疆大盘鸡", "肉蟹煲", "麻辣香锅"]
+  notes: "简介都强调聚餐/一锅出的分量感。"
+
+- id: q024
+  category: scene
+  query: "第二天想带饭，做个凉拌菜"
+  relevant: ["凉拌木耳", "凉拌黄瓜", "凉拌莴笋"]
+  notes: "适合隔夜携带的凉拌素菜三选。"
+
+- id: q025
+  category: taste
+  query: "想吃清淡不辣的家常菜"
+  relevant: ["清蒸鲈鱼", "蒜蓉西兰花", "白灼菜心"]
+  notes: "三道明确标清淡的菜；反例是水煮牛肉、麻辣香锅等麻辣项。"
+
+- id: q026
+  category: taste
+  query: "想吃川菜，要麻辣一点"
+  relevant: ["水煮牛肉", "麻婆豆腐", "回锅肉"]
+  notes: "经典川味三道；检验菜系标签能否从简介文字中被召回。"
+
+- id: q027
+  category: taste
+  query: "想吃酸甜开胃的菜"
+  relevant: ["咕噜肉", "鱼香肉丝", "糖醋鲤鱼"]
+  notes: "简介分别写酸甜/酸甜微辣/酸甜适口。"
+
+- id: q028
+  category: taste
+  query: "想吃广式清淡蒸菜"
+  relevant: ["豉汁蒸白鱔", "清蒸鲈鱼", "豉汁排骨"]
+  notes: "三道粤式蒸品，覆盖鱼/排骨两类蒸法。"
+
+- id: q029
+  category: taste
+  query: "想吃湘菜，香辣下饭"
+  relevant: ["小炒肉", "辣椒炒肉", "农家一碗香"]
+  notes: "简介均标湖南/湘式小炒，辣度与下饭属性一致。"
+
+- id: q030
+  category: taste
+  query: "想吃东北菜，分量大又下饭"
+  relevant: ["老式锅包肉", "猪肉烩酸菜", "茄子炖土豆"]
+  notes: "东北经典三道（锅包肉出自哈尔滨道台府，另两道为东北炖菜）。"
+
+- id: q031
+  category: taste
+  query: "想吃西餐，意面或者烤鸡"
+  relevant: ["意式肉酱面", "意式烤鸡"]
+  notes: "库中明确标注意式的两道；炒意大利面偏中式做法，不纳入。"
+
+- id: q032
+  category: taste
+  query: "想吃口味清淡的素菜"
+  relevant: ["清炒花菜", "蒜蓉炒芹菜", "水油焖蔬菜"]
+  notes: "三道低油清淡素菜；与 q025 的区别是不含荤腥。"
+
+- id: q033
+  category: tool
+  query: "家里只有空气炸锅，能做什么"
+  relevant: ["空气炸锅羊排", "空气炸锅鸡翅中", "空气炸锅面包片"]
+  notes: "库中共 8 道空气炸锅菜；取最直接的 3 道（含甜辣烤全翅、红柚蛋糕等干扰项）。"
+
+- id: q034
+  category: tool
+  query: "用微波炉能做的早餐"
+  relevant: ["微波炉蒸蛋", "微波炉荷包蛋", "微波炉鸡蛋羹"]
+  notes: "三道微波蛋料理；太阳蛋同为微波早餐，属同类干扰项。"
+
+- id: q035
+  category: tool
+  query: "有电饭煲，想做一锅饭"
+  relevant: ["电饭煲三文鱼炊饭", "电饭煲蒸米饭"]
+  notes: "库中工具字段含电饭煲的菜品；速冻馄饨虽可用电饭煲但不属于焖饭。"
+
+- id: q036
+  category: tool
+  query: "想用烤箱做点甜点"
+  relevant: ["戚风蛋糕", "玛格丽特饼干", "烤蛋挞"]
+  notes: "工具字段含烤箱的三道烘焙甜点；提拉米苏无需烤箱不纳入。"
+
+- id: q037
+  category: tool
+  query: "用高压锅快速炖肉"
+  relevant: ["柱候牛腩", "红烧猪蹄", "菌菇炖乳鸽"]
+  notes: "柱候牛腩与菌菇炖乳鸽的工具字段直接是高压锅，红烧猪蹄简介说明可用高压锅简化。"
+
+- id: q038
+  category: tool
+  query: "不用烤箱的甜点"
+  relevant: ["提拉米苏", "芋泥雪媚娘", "龟苓膏"]
+  notes: "简介明确「无需烤箱」或本身免烤冷藏成型的三道甜品。"
+
+- id: q039
+  category: tool
+  query: "第一次下厨也想成功的简单做法"
+  relevant: ["葱油桂鱼", "蚝油生菜", "皮蛋豆腐"]
+  notes: "简介分别写「基本零失败」「对新手非常友好」「几乎零门槛」。"
+
+- id: q040
+  category: tool
+  query: "要发酵、得花时间等的中式面点"
+  relevant: ["基础牛奶面包", "披萨饼皮", "印度烤饼"]
+  notes: "三道都强调发酵/隔夜冷藏等待的面点；手抓饼等半烫面做法不纳入。"
