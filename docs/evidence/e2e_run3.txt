@@ -1,0 +1,30 @@
+=== POST /recommend {"query": "西红柿炒鸡蛋"}
+    HTTP 200  耗时 9168 ms
+    recommendations=3 degraded=True degradations=['recommendation_shortfall'] node_path=['parse', 'search', 'generate', 'validate']
+    no_solution_reason=None
+      - 西红柿炒鸡蛋 (id=2e239ee6…) reason='完全匹配用户需求的西红柿炒鸡蛋'
+      - 西红柿鸡蛋挂面 (id=96090f58…) reason='包含西红柿和鸡蛋的变体做法'
+      - 西葫芦炒鸡蛋 (id=1b3ca4dc…) reason='命中你的需求「西红柿炒鸡蛋」的混合检索第 3 名结果'
+
+=== POST /recommend {"query": "20 分钟能搞定的家常菜"}
+    HTTP 200  耗时 2228 ms
+    recommendations=0 degraded=False degradations=[] node_path=['parse', 'search', 'no_solution']
+    no_solution_reason='no_candidates_under_constraints'
+
+=== POST /recommend {"query": "清淡的汤，不要辣"}
+    HTTP 200  耗时 9160 ms
+    recommendations=3 degraded=True degradations=['recommendation_shortfall'] node_path=['parse', 'search', 'generate', 'validate']
+    no_solution_reason=None
+      - 金针菇汤 (id=92bf2a7f…) reason='金针菇汤清淡且不含辣，符合用户需求'
+      - 生汆丸子汤 (id=efc62408…) reason='生汆丸子汤清淡且不含辣，符合用户需求'
+      - 朱雀汤 (id=1c5d1aac…) reason='命中你的需求「清淡的汤，不要辣」的混合检索第 3 名结果'
+
+=== POST /recipes/search {"query": "有鸡蛋和番茄", "top_k": 5}
+    HTTP 200  耗时 441 ms
+    candidates=5 degraded=False
+    top5=['番茄牛肉蛋花汤', '意式香肠北非蛋', '罗宋汤', '鸡蛋三明治', '温泉蛋']
+
+=== POST /recommend {"query": ""}
+    HTTP 422  耗时 18 ms
+    recommendations=0 degraded=None degradations=None node_path=None
+    no_solution_reason=None

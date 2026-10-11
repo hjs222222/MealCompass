@@ -1,0 +1,333 @@
+{
+  "source": "HowToCook",
+  "upstream_commit": "a2d45c6984dff9ee941da0e7c452f7965965d962",
+  "root": "D:/Allcode/MealCompass/data/raw/howtocook",
+  "files_seen": 372,
+  "parsed": 372,
+  "failed": 0,
+  "failures": [],
+  "categories": {
+    "aquatic": 28,
+    "breakfast": 25,
+    "condiment": 9,
+    "dessert": 19,
+    "drink": 23,
+    "meat_dish": 111,
+    "semi-finished": 10,
+    "soup": 24,
+    "staple": 59,
+    "vegetable_dish": 64
+  },
+  "difficulty_coverage": 372,
+  "calories_coverage": 372,
+  "ingredients_total": 3697,
+  "ingredients_unique": 1162,
+  "ingredients_normalized": 2784,
+  "ingredients_normalization_rate": 75.3,
+  "ingredients_unmapped_unique": 748,
+  "unmapped_top": [
+    [
+      "葱花",
+      11
+    ],
+    [
+      "娃娃菜",
+      4
+    ],
+    [
+      "猪五花肉",
+      4
+    ],
+    [
+      "肉末",
+      4
+    ],
+    [
+      "米",
+      4
+    ],
+    [
+      "咖喱块",
+      3
+    ],
+    [
+      "葱姜蒜",
+      3
+    ],
+    [
+      "藤椒油",
+      3
+    ],
+    [
+      "鲤鱼",
+      3
+    ],
+    [
+      "泡打粉",
+      3
+    ],
+    [
+      "糯米",
+      3
+    ],
+    [
+      "干辣椒面",
+      3
+    ],
+    [
+      "花椒粉",
+      3
+    ],
+    [
+      "酵母",
+      3
+    ],
+    [
+      "酥油",
+      3
+    ],
+    [
+      "小豆蔻粉",
+      3
+    ],
+    [
+      "原味酸奶",
+      3
+    ],
+    [
+      "金酒",
+      3
+    ],
+    [
+      "可乐",
+      3
+    ],
+    [
+      "油泼辣子",
+      3
+    ],
+    [
+      "蒜粉",
+      3
+    ],
+    [
+      "花椒油",
+      3
+    ],
+    [
+      "羊排",
+      3
+    ],
+    [
+      "虾皮",
+      3
+    ],
+    [
+      "包菜",
+      3
+    ],
+    [
+      "肉",
+      3
+    ],
+    [
+      "米粉",
+      3
+    ],
+    [
+      "耗油",
+      3
+    ],
+    [
+      "花菜",
+      3
+    ],
+    [
+      "味极鲜",
+      3
+    ]
+  ],
+  "tools_unique": {
+    "烤箱": 9,
+    "平底锅": 8,
+    "炒锅": 7,
+    "模具": 6,
+    "盆": 6,
+    "碗": 6,
+    "空气炸锅": 6,
+    "高压锅": 6,
+    "保鲜膜": 5,
+    "微波炉": 5,
+    "打蛋器": 5,
+    "擀面杖": 5,
+    "蒸锅": 5,
+    "厨房纸": 4,
+    "手动压汁器": 4,
+    "搅拌机": 4,
+    "电饭煲": 4,
+    "菜刀": 4,
+    "小碗": 3,
+    "水果刀": 3,
+    "滤网": 3,
+    "盘子": 3,
+    "砂锅": 3,
+    "筷子": 3,
+    "不粘锅": 2,
+    "油纸": 2,
+    "温度计": 2,
+    "砧板": 2,
+    "蒸笼": 2,
+    "量杯": 2,
+    "铁锅": 2,
+    "锡纸": 2,
+    "隔热手套": 2,
+    "一次性塑料手套": 1,
+    "一次性手套": 1,
+    "分蛋器": 1,
+    "刨丝器": 1,
+    "利口酒杯": 1,
+    "削皮刀": 1,
+    "压汁器": 1,
+    "厨房秤": 1,
+    "吧勺": 1,
+    "吸油纸": 1,
+    "奶锅": 1,
+    "定时器": 1,
+    "密封袋": 1,
+    "捣药罐": 1,
+    "料理机": 1,
+    "榨汁机": 1,
+    "汤锅": 1,
+    "海波杯": 1,
+    "漏勺": 1,
+    "灶台": 1,
+    "烘焙纸": 1,
+    "烤炉": 1,
+    "烤盘": 1,
+    "烤网": 1,
+    "燃气灶": 1,
+    "电压力锅": 1,
+    "电炖锅": 1,
+    "电磁炉": 1,
+    "电饼铛": 1,
+    "蒜臼": 1,
+    "蒸架": 1,
+    "调酒杯": 1,
+    "量酒器": 1,
+    "铝箔纸": 1,
+    "锅铲": 1,
+    "锡箔纸": 1,
+    "雪克杯": 1,
+    "雪克瓶": 1,
+    "面包机": 1,
+    "高球杯": 1
+  },
+  "unresolved_amount_count": 25,
+  "unresolved_amount_samples": [
+    {
+      "path": "condiment/油酥.md",
+      "line": "盐",
+      "amount_text": "g"
+    },
+    {
+      "path": "condiment/油酥.md",
+      "line": "面粉",
+      "amount_text": "g"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "盐量",
+      "amount_text": "兔肉斤数 * 2 克"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "味精量",
+      "amount_text": "兔肉斤数 * 1 克"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "蚝油量",
+      "amount_text": "兔肉斤数 * 5 克"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "料酒量",
+      "amount_text": "兔肉斤数 * 10 克"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "油量",
+      "amount_text": "兔肉斤数 * 0.9 ～ 1 升"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "蒜量",
+      "amount_text": "兔肉斤数 * 二分之一头蒜"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "姜量",
+      "amount_text": "蒜量"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "干辣椒量",
+      "amount_text": "辣椒段的总体积等于兔肉的总体积"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "八角量",
+      "amount_text": "兔肉斤数 * 1 粒"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "桂皮量",
+      "amount_text": "兔肉斤数 * 大拇指长短的一块"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "香叶量",
+      "amount_text": "兔肉斤数 * 5 片"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "山奈量",
+      "amount_text": "兔肉斤数 * 黄豆大小的一块"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "白蔻量",
+      "amount_text": "兔肉斤数 * 2 颗"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "小茴香量",
+      "amount_text": "兔肉斤数 * 15 克"
+    },
+    {
+      "path": "meat_dish/冷吃兔.md",
+      "line": "白芝麻量",
+      "amount_text": "兔肉斤数 * 25 克"
+    },
+    {
+      "path": "meat_dish/姜炒鸡/姜炒鸡.md",
+      "line": "啤酒",
+      "amount_text": "半瓶 250ml"
+    },
+    {
+      "path": "meat_dish/黑椒牛柳/黑椒牛柳.md",
+      "line": "黑椒腌料",
+      "amount_text": "参照所购商品的说明按比例腌制"
+    },
+    {
+      "path": "soup/生汆丸子汤.md",
+      "line": "盐量",
+      "amount_text": "猪肉斤数 * 6 克"
+    }
+  ],
+  "recipes_with_images": 177,
+  "images_total": 346,
+  "external_images_total": 2,
+  "missing_image_count": 0,
+  "missing_image_samples": []
+}

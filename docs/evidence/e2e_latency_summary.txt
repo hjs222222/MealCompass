@@ -1,0 +1,15 @@
+参与聚合的轮次（3）：e2e_run2.txt, e2e_run3.txt, e2e_run4.txt
+
+场景                                                           轮数      min      max       极差  状态码
+POST /recommend {"query": "西红柿炒鸡蛋"}                           3    9168ms   12007ms     2.8s  200
+POST /recommend {"query": "清淡的汤，不要辣"}                         3    7552ms    9160ms     1.6s  200
+POST /recommend {"query": "20 分钟能搞定的家常菜"}                     3    2086ms    2292ms    206ms  200
+POST /recipes/search {"query": "有鸡蛋和番茄", "top_k": 5}          3     374ms     444ms     70ms  200
+POST /recommend {"query": ""}                                 3       3ms      18ms     15ms  422
+
+已排除的轮次（已知脚本 bug，不得参与统计）：e2e_run1_OLD_PROBE_field_bug.txt
+
+怎么用：
+  1. README 的端到端表用这里的 min–max，不要用单次值；
+  2. 波动几乎全部来自 LLM 生成阶段——检索侧（/recipes/search）三轮极差只有几十毫秒；
+  3. 含 LLM 往返的指标默认按多次运行给区间，这是仓库规矩（见 docs/mistakes.md）。

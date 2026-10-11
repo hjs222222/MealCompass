@@ -1,0 +1,47 @@
+Recall@5 回落查询：7 条 → ['q009', 'q017', 'q024', 'q026', 'q028', 'q029', 'q036']
+
+q009 [ingredients] 家里只剩鸡蛋和番茄，能做什么菜
+    R@5 vector=0.667 → hybrid=0.000；双通道交集=21
+    gold 西红柿炒鸡蛋: 仅向量  vector_rank=1  bm25_rank=None  rrf_rank=22
+    gold 西红柿鸡蛋汤: 仅向量  vector_rank=2  bm25_rank=None  rrf_rank=23
+    gold 西红柿鸡蛋挂面: 仅向量  vector_rank=8  bm25_rank=None  rrf_rank=27
+q017 [scene] 十五分钟就能做好的快手菜
+    R@5 vector=0.333 → hybrid=0.000；双通道交集=12
+    gold 白灼虾: 仅向量  vector_rank=1  bm25_rank=None  rrf_rank=13
+    gold 蒜蓉虾: 仅向量  vector_rank=47  bm25_rank=None  rrf_rank=None
+    gold 西红柿炒鸡蛋: 两路Top50均未召回  vector_rank=None  bm25_rank=None  rrf_rank=None
+q024 [scene] 第二天想带饭，做个凉拌菜
+    R@5 vector=0.667 → hybrid=0.333；双通道交集=2
+    gold 凉拌木耳: 仅向量  vector_rank=8  bm25_rank=None  rrf_rank=13
+    gold 凉拌黄瓜: 仅向量  vector_rank=3  bm25_rank=None  rrf_rank=6
+    gold 凉拌莴笋: 仅向量  vector_rank=2  bm25_rank=None  rrf_rank=4
+q026 [taste] 想吃川菜，要麻辣一点
+    R@5 vector=0.667 → hybrid=0.333；双通道交集=15
+    gold 水煮牛肉: 双通道  vector_rank=5  bm25_rank=8  rrf_rank=4
+    gold 麻婆豆腐: 仅向量  vector_rank=3  bm25_rank=None  rrf_rank=17
+    gold 回锅肉: 仅向量  vector_rank=14  bm25_rank=None  rrf_rank=24
+q028 [taste] 想吃广式清淡蒸菜
+    R@5 vector=0.667 → hybrid=0.333；双通道交集=12
+    gold 豉汁蒸白鱔: 双通道  vector_rank=6  bm25_rank=23  rrf_rank=7
+    gold 清蒸鲈鱼: 双通道  vector_rank=2  bm25_rank=1  rrf_rank=1
+    gold 豉汁排骨: 仅向量  vector_rank=4  bm25_rank=None  rrf_rank=14
+q029 [taste] 想吃湘菜，香辣下饭
+    R@5 vector=1.000 → hybrid=0.333；双通道交集=19
+    gold 小炒肉: 双通道  vector_rank=5  bm25_rank=6  rrf_rank=2
+    gold 辣椒炒肉: 双通道  vector_rank=4  bm25_rank=40  rrf_rank=8
+    gold 农家一碗香: 双通道  vector_rank=2  bm25_rank=47  rrf_rank=9
+q036 [tool] 想用烤箱做点甜点
+    R@5 vector=0.333 → hybrid=0.000；双通道交集=20
+    gold 戚风蛋糕: 仅向量  vector_rank=1  bm25_rank=None  rrf_rank=21
+    gold 玛格丽特饼干: 双通道  vector_rank=12  bm25_rank=12  rrf_rank=7
+    gold 烤蛋挞: 仅向量  vector_rank=6  bm25_rank=None  rrf_rank=23
+
+== 汇总（7 条回落查询） ==
+  gold 项数=21：双通道=7 仅向量=13 仅BM25=0 两路均未召回=1
+  Top10 中双通道共识项=62/70
+
+== 40 条全量头部构成（来自 hybrid.json 的 channel_sources） ==
+  Top5 双通道=185/200 (92.5%)；Top10 双通道=346/400 (86.5%) BM25-only=11 向量-only=43
+
+== 机制（k=60，池=50） ==
+  单通道项上界 1/(k+1)=0.016393 < 双通道项下界 2/(k+50)=0.018182

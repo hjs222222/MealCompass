@@ -1,0 +1,375 @@
+{
+  "reports_dir": "D:\\Allcode\\MealCompass\\data\\eval\\reports",
+  "count": 4,
+  "reports": [
+    {
+      "file": "ablation_weight.json",
+      "sha256_16": "49de57b9eb18f383",
+      "bytes": 172261,
+      "mode": "weight_ablation",
+      "evaluated_at": "2026-10-11T15:50:11.146065+00:00",
+      "query_count": 40,
+      "pool_size": 50,
+      "rrf_k": 60,
+      "latency_note": "每条查询只算一次 embedding + 一次向量 SQL，延迟含远程 embedding 调用",
+      "search_latency_ms": {
+        "median": 153.3,
+        "p95": 196.2,
+        "mean": 171.385,
+        "min": 136.0,
+        "max": 733.6
+      },
+      "provider_stats": {
+        "embedding": {
+          "model": "BAAI/bge-m3",
+          "last_provider": "remote",
+          "last_error": null,
+          "remote_calls": 40,
+          "degraded_calls": 0
+        },
+        "scope": "this_run"
+      },
+      "configs": [
+        {
+          "name": "w_bm25=0.0",
+          "note": "退化为纯向量",
+          "w_vector": 1.0,
+          "w_bm25": 0.0,
+          "per_channel_top": 50,
+          "metrics": {
+            "recall@5": 0.6375,
+            "recall@10": 0.720833,
+            "mrr@10": 0.74,
+            "ndcg@5": 0.630878
+          },
+          "channel_mix": {
+            "gold_dual_channel": 57,
+            "gold_single_channel": 24,
+            "gold_not_recalled_in_top_n": 12,
+            "dual_channel_items_in_top5": 117,
+            "dual_channel_items_in_top10": 208,
+            "dual_channel_share_of_top10": 0.52
+          }
+        },
+        {
+          "name": "w_bm25=0.25",
+          "note": "弱化 BM25",
+          "w_vector": 1.0,
+          "w_bm25": 0.25,
+          "per_channel_top": 50,
+          "metrics": {
+            "recall@5": 0.620833,
+            "recall@10": 0.741667,
+            "mrr@10": 0.712738,
+            "ndcg@5": 0.6082
+          },
+          "channel_mix": {
+            "gold_dual_channel": 57,
+            "gold_single_channel": 24,
+            "gold_not_recalled_in_top_n": 12,
+            "dual_channel_items_in_top5": 170,
+            "dual_channel_items_in_top10": 293,
+            "dual_channel_share_of_top10": 0.7325
+          }
+        },
+        {
+          "name": "w_bm25=0.5",
+          "note": "半权 BM25",
+          "w_vector": 1.0,
+          "w_bm25": 0.5,
+          "per_channel_top": 50,
+          "metrics": {
+            "recall@5": 0.629167,
+            "recall@10": 0.716667,
+            "mrr@10": 0.693542,
+            "ndcg@5": 0.603364
+          },
+          "channel_mix": {
+            "gold_dual_channel": 57,
+            "gold_single_channel": 24,
+            "gold_not_recalled_in_top_n": 12,
+            "dual_channel_items_in_top5": 183,
+            "dual_channel_items_in_top10": 341,
+            "dual_channel_share_of_top10": 0.8525
+          }
+        },
+        {
+          "name": "w_bm25=1.0",
+          "note": "现状：等权 RRF",
+          "w_vector": 1.0,
+          "w_bm25": 1.0,
+          "per_channel_top": 50,
+          "metrics": {
+            "recall@5": 0.6125,
+            "recall@10": 0.6875,
+            "mrr@10": 0.708571,
+            "ndcg@5": 0.598244
+          },
+          "channel_mix": {
+            "gold_dual_channel": 57,
+            "gold_single_channel": 24,
+            "gold_not_recalled_in_top_n": 12,
+            "dual_channel_items_in_top5": 186,
+            "dual_channel_items_in_top10": 349,
+            "dual_channel_share_of_top10": 0.8725
+          }
+        },
+        {
+          "name": "w_bm25=0.25+top10",
+          "note": "弱化 BM25 且只取各通道 Top10（截断尾部噪声）",
+          "w_vector": 1.0,
+          "w_bm25": 0.25,
+          "per_channel_top": 10,
+          "metrics": {
+            "recall@5": 0.6125,
+            "recall@10": 0.720833,
+            "mrr@10": 0.7325,
+            "ndcg@5": 0.609115
+          },
+          "channel_mix": {
+            "gold_dual_channel": 38,
+            "gold_single_channel": 29,
+            "gold_not_recalled_in_top_n": 26,
+            "dual_channel_items_in_top5": 110,
+            "dual_channel_items_in_top10": 126,
+            "dual_channel_share_of_top10": 0.315
+          }
+        },
+        {
+          "name": "depth_normalized_top10",
+          "note": "等权但两路都只取 Top10（按召回深度归一）",
+          "w_vector": 1.0,
+          "w_bm25": 1.0,
+          "per_channel_top": 10,
+          "metrics": {
+            "recall@5": 0.6125,
+            "recall@10": 0.695833,
+            "mrr@10": 0.713155,
+            "ndcg@5": 0.598036
+          },
+          "channel_mix": {
+            "gold_dual_channel": 38,
+            "gold_single_channel": 29,
+            "gold_not_recalled_in_top_n": 26,
+            "dual_channel_items_in_top5": 110,
+            "dual_channel_items_in_top10": 126,
+            "dual_channel_share_of_top10": 0.315
+          }
+        }
+      ]
+    },
+    {
+      "file": "hybrid.json",
+      "sha256_16": "60cacb548cedb9d8",
+      "bytes": 359135,
+      "mode": "hybrid",
+      "evaluated_at": "2026-10-11T15:49:10.645795+00:00",
+      "query_count": 40,
+      "pool_size": 50,
+      "metrics": {
+        "recall@5": 0.6125,
+        "recall@10": 0.6875,
+        "mrr@10": 0.708571,
+        "ndcg@5": 0.598244
+      },
+      "latency_ms": {
+        "median": 150.8,
+        "p95": 446.3,
+        "mean": 197.5,
+        "min": 130.8,
+        "max": 951.2
+      },
+      "by_category": {
+        "direct": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "ndcg@5": 1.0
+        },
+        "ingredients": {
+          "recall@5": 0.8125,
+          "recall@10": 0.8125,
+          "mrr@10": 0.875,
+          "ndcg@5": 0.807937
+        },
+        "scene": {
+          "recall@5": 0.166667,
+          "recall@10": 0.25,
+          "mrr@10": 0.24375,
+          "ndcg@5": 0.143626
+        },
+        "taste": {
+          "recall@5": 0.5,
+          "recall@10": 0.666667,
+          "mrr@10": 0.71875,
+          "ndcg@5": 0.479261
+        },
+        "tool": {
+          "recall@5": 0.583333,
+          "recall@10": 0.708333,
+          "mrr@10": 0.705357,
+          "ndcg@5": 0.560398
+        }
+      },
+      "provider_stats": {
+        "embedding": {
+          "model": "BAAI/bge-m3",
+          "last_provider": "remote",
+          "last_error": null,
+          "remote_calls": 41,
+          "degraded_calls": 0
+        },
+        "rerank": {
+          "model": "BAAI/bge-reranker-v2-m3",
+          "last_provider": null,
+          "last_error": null,
+          "remote_calls": 0,
+          "degraded_calls": 0
+        },
+        "scope": "this_run"
+      }
+    },
+    {
+      "file": "hybrid_rerank.json",
+      "sha256_16": "012b3a433c992ddc",
+      "bytes": 359312,
+      "mode": "hybrid_rerank",
+      "evaluated_at": "2026-10-11T15:49:43.471400+00:00",
+      "query_count": 40,
+      "pool_size": 50,
+      "metrics": {
+        "recall@5": 0.641667,
+        "recall@10": 0.775,
+        "mrr@10": 0.678125,
+        "ndcg@5": 0.594859
+      },
+      "latency_ms": {
+        "median": 765.0,
+        "p95": 984.6,
+        "mean": 813.1,
+        "min": 712.6,
+        "max": 1554.8
+      },
+      "by_category": {
+        "direct": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "ndcg@5": 1.0
+        },
+        "ingredients": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.875,
+          "ndcg@5": 0.91273
+        },
+        "scene": {
+          "recall@5": 0.25,
+          "recall@10": 0.5,
+          "mrr@10": 0.338542,
+          "ndcg@5": 0.195649
+        },
+        "taste": {
+          "recall@5": 0.416667,
+          "recall@10": 0.625,
+          "mrr@10": 0.558333,
+          "ndcg@5": 0.370598
+        },
+        "tool": {
+          "recall@5": 0.541667,
+          "recall@10": 0.75,
+          "mrr@10": 0.61875,
+          "ndcg@5": 0.495317
+        }
+      },
+      "provider_stats": {
+        "embedding": {
+          "model": "BAAI/bge-m3",
+          "last_provider": "remote",
+          "last_error": null,
+          "remote_calls": 41,
+          "degraded_calls": 0
+        },
+        "rerank": {
+          "model": "BAAI/bge-reranker-v2-m3",
+          "last_provider": "remote",
+          "last_error": null,
+          "remote_calls": 41,
+          "degraded_calls": 0
+        },
+        "scope": "this_run"
+      }
+    },
+    {
+      "file": "vector.json",
+      "sha256_16": "e637d1eaba54bb1b",
+      "bytes": 52007,
+      "mode": "vector",
+      "evaluated_at": "2026-10-11T15:49:02.565335+00:00",
+      "query_count": 40,
+      "pool_size": 50,
+      "metrics": {
+        "recall@5": 0.6375,
+        "recall@10": 0.720833,
+        "mrr@10": 0.74,
+        "ndcg@5": 0.630878
+      },
+      "latency_ms": {
+        "median": 152.4,
+        "p95": 859.3,
+        "mean": 218.9,
+        "min": 135.7,
+        "max": 956.5
+      },
+      "by_category": {
+        "direct": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "ndcg@5": 1.0
+        },
+        "ingredients": {
+          "recall@5": 0.895833,
+          "recall@10": 0.9375,
+          "mrr@10": 1.0,
+          "ndcg@5": 0.922313
+        },
+        "scene": {
+          "recall@5": 0.208333,
+          "recall@10": 0.333333,
+          "mrr@10": 0.395833,
+          "ndcg@5": 0.22067
+        },
+        "taste": {
+          "recall@5": 0.5,
+          "recall@10": 0.583333,
+          "mrr@10": 0.491667,
+          "ndcg@5": 0.409898
+        },
+        "tool": {
+          "recall@5": 0.583333,
+          "recall@10": 0.75,
+          "mrr@10": 0.8125,
+          "ndcg@5": 0.601506
+        }
+      },
+      "provider_stats": {
+        "embedding": {
+          "model": "BAAI/bge-m3",
+          "last_provider": "remote",
+          "last_error": null,
+          "remote_calls": 41,
+          "degraded_calls": 0
+        },
+        "rerank": {
+          "model": "BAAI/bge-reranker-v2-m3",
+          "last_provider": null,
+          "last_error": null,
+          "remote_calls": 0,
+          "degraded_calls": 0
+        },
+        "scope": "this_run"
+      }
+    }
+  ]
+}
