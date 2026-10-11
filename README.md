@@ -1,62 +1,267 @@
-
 # MealCompass · 饭点罗盘
 
-> 基于混合检索与 LangGraph Agent 的多约束菜谱规划助手
-> 根据你的食材、时间、厨具、口味偏好，推荐今天吃什么/做什么，并生成步骤、替代食材与购物清单。
+> 基于混合检索与 LangGraph 的多约束菜谱推荐 Agent
+> 根据你的食材、时间、厨具、忌口，推荐今天做什么，并给出推荐理由与缺失食材。
 >
-> **文档版本 v1.1（2026-10-06）**：已统一跨文档冲突，全局口径见下方「全局约定（唯一口径）」。
+> **文档版本 v1.2（2026-10-11）**：README 口径改为「以实测证据为准」，未测量的一律标注。全局口径见 [全局约定（唯一口径）](#-全局约定唯一口径)。
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-orange)](https://langchain-ai.github.io/langgraph/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1.2-orange)](https://langchain-ai.github.io/langgraph/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](./LICENSE)
 
+---
+
+## 📌 当前状态（先读这一节）
+
+这个项目**还在开发中**，下面每一行都不是路线图，而是**当前的真实状态**：
+
+| 能力 | 状态 | 证据 |
+| --- | --- | --- |
+| 菜谱知识库（372 道 / 3,697 条食材 / 3,806 个步骤） | ✅ 已入库并实测 | `data/recipes/import_report.json` |
+| 双层向量索引（卡片级 + 步骤级，1024 维，HNSW） | ✅ 已建 | 库里 372 + 3,806 条向量 |
+| 混合检索（向量 Top50 + BM25 Top50 → RRF → 重排） | ✅ 已实现并实测 | `backend/rag/retriever.py`、`scripts/smoke_retrieval.py` |
+| 硬约束**下推**到检索层（忌口 / 时间 / 厨具） | ✅ 已实现（SQL 层） | `backend/rag/retriever.py`、`tests/unit/test_retriever_filters.py` |
+| 引用校验（拒绝 LLM 编造 `recipe_id`） | ✅ 已实现并接入 | `backend/domain/citations.py` |
+| LangGraph 最小闭环（parse → search → generate → validate） | ✅ 已实现 | `backend/agents/` |
+| `POST /recommend`、`POST /recipes/search` 接口 | ✅ 已实现 | `backend/api/v1/recommend.py` |
+| 混合检索消融实验（纯向量 / 混合 / 混合+重排） | ✅ **已实测**，数字见 [评估结果](#-评估结果) | `data/eval/`、`backend/scripts/eval.py` |
+| 前端推荐页 `/recommend` | ✅ 已实现 | `frontend/app/(main)/recommend/` |
+| 规则引擎 YAML 化（`data/rules/`） | 🚧 未实现 | 目录不存在；当前约束由请求参数直接给 |
+| 澄清追问 / 反思重试 / 多轮对话 | 🚧 未实现 | 无 `MemorySaver`/`PostgresSaver` 会话持久化接线 |
+| 注册登录（邮箱 + JWT） | 🚧 未实现 | `/login` 仍是禁用占位表单 |
+| 菜谱详情 / 购物清单 / 一周菜单 | 🚧 未实现 | 无对应路由 |
+| 前端自动化测试 | 🚧 未实现 | 仓库内 0 个前端测试 |
+
+> 未完成、未验证、被环境挡住的东西，逐项登记在 [`docs/failed-features.md`](./docs/failed-features.md)——**不假装可用**。
+> 踩坑与解决过程登记在 [`docs/mistakes.md`](./docs/mistakes.md)。
+
+---
+
 ## 📖 项目简介
 
-MealCompass 是一个面向**所有做饭的普通人**的智能菜谱推荐 Agent。它不只是一个“今天吃什么”的随机转盘，而是结合了**混合检索（向量 + BM25 + 重排）**、**规则引擎（硬约束）** 和 **LangGraph Agent 编排**，根据你的食材、时间、厨具和忌口，提供安全、个性化、可解释的菜谱推荐。
+MealCompass 面向**所有做饭的普通人**：不只是一个"今天吃什么"的随机转盘，而是先用**硬约束**把你明显做不了或不能吃的菜剔掉，再用**混合检索**找近似菜谱，最后让 **LLM 只负责解释与取舍**，并且任何推荐都必须指向知识库里真实存在的 `recipe_id`。
 
-**核心差异化**：
+**核心设计取舍**：
 
-- 🧩 **硬约束规则引擎**：过敏原/忌口、可用时间、可用厨具由 YAML 规则判定，LLM 不参与，确保安全且可解释。
-- 🔍 **混合检索**：BGE-M3 稠密向量 + BM25 关键词 + RRF 融合 + bge-reranker 重排，Recall@5 ≥ 85%。
-- 🤖 **Agent 编排**：LangGraph 状态机，包含查询理解、澄清追问、工具调用、反思校验，支持多轮对话。
-- 🏗️ **可维护架构**：模块化单体 + 分层依赖 + 抽象接口先行，新增约束/工具零核心改动。
-- 📊 **可评估可观测**：Langfuse 链路追踪 + RAGAS 量化评估，所有指标可复现。
+- 🧩 **能确定的不交给 LLM**：忌口、时间、厨具是硬约束，**下推到 SQL 检索层**，LLM 不参与判定——它只负责把自然语言查询翻译成约束、把候选菜谱翻译成人话。
+- 🔍 **混合检索而不是纯向量**：BGE-M3 稠密向量 + BM25 关键词 + RRF 融合 + bge-reranker 重排。四段各自有单测与消融数据（见 [评估结果](#-评估结果)）。
+- 🤖 **最小可讲的 Agent 闭环**：LangGraph 状态机 `parse → search →（无解则短路）→ generate → validate`。**刻意不做**七节点编排——先把一条链路做扎实、可测量。
+- 🛡️ **防幻觉是硬校验不是提示词**：`domain/citations.py` 在领域层校验每个 `recipe_id` 必须精确命中候选，编造的引用会被丢弃。
+- 🏗️ **接口先行**：所有 Protocol 集中在 `backend/domain/ports.py`，实现在 `infra/`、`rag/`；`domain` 零 IO。
+- 📊 **可观测与可复现**：Langfuse 链路追踪（观察名是契约常量），未配 key 时自动降级为本地结构化日志。
+
+---
 
 ## ✨ 核心功能
 
-| 模块         | 功能                                             | 状态   |
-| ------------ | ------------------------------------------------ | ------ |
-| 用户与画像   | 邮箱 + JWT 登录、通用画像（口味/忌口/厨具/技能，MVP）、长期记忆（P1） | MVP/P1 |
-| 知识库与 RAG | 200+ 结构化菜谱、混合检索、重排、引用防幻觉      | MVP    |
-| Agent 推荐   | 查询理解、澄清追问、3 道推荐、反思校验、工具调用 | MVP    |
-| 约束引擎     | 忌口/过敏、时间、厨具硬过滤 + 口味软偏好（YAML 可配） | MVP   |
-| 菜谱与烹饪   | 菜谱详情、份量缩放、食材替代、烹饪指导模式       | MVP/P1 |
-| 购物与规划   | 购物清单合并、一周菜单、食材库存                 | MVP/P1 |
-| 反馈与迭代   | 点赞/踩/收藏/做过、历史记录、评估看板            | MVP/P1 |
-| 系统与运维   | 分层架构、配置外置、Langfuse、Docker 部署        | MVP    |
+状态口径：`✅ 已实现并实测` / `🚧 开发中` / `📋 已规划未开始`
 
-> 详细功能列表与验收标准（DoD）见 [`docs/PRD.md`](./docs/PRD.md)。
+| 模块 | 功能 | 状态 |
+| --- | --- | --- |
+| 知识库与 RAG | 372 道结构化菜谱、双层索引、混合检索、重排、引用防幻觉 | ✅ 已实现并实测 |
+| Agent 推荐 | 最小闭环（查询理解 → 检索 → 生成 → 引用校验）、无解显式返回 | ✅ 已实现并实测 |
+| 约束引擎 | 忌口 / 时间 / 厨具**硬过滤下推到检索层** | ✅ 已实现（SQL 层） |
+| 约束引擎 | 口味软偏好、YAML 规则热更新 | 🚧 开发中 |
+| Agent 推荐 | 澄清追问、反思重试、多轮对话、工具调用 | 🚧 开发中 |
+| 用户与画像 | 邮箱 + JWT、画像 CRUD | 🚧 开发中 |
+| 菜谱与烹饪 | 详情、份量缩放、食材替代、烹饪指导模式 | 🚧 开发中 |
+| 购物与规划 | 购物清单、一周菜单、库存 | 📋 已规划未开始 |
+| 反馈与迭代 | 点赞 / 收藏 / 做过、历史记录 | 📋 已规划未开始 |
+| 系统与运维 | 分层架构、配置外置、Langfuse、Docker、CI | ✅ 已实现 |
+| 评估 | 40 条人工核验评估集 + 三组消融 + Recall/nDCG 复现脚本 | ✅ 已实现并实测 |
+
+> 完整功能列表与验收标准（DoD）见 [`docs/PRD.md`](./docs/PRD.md)。
+
+---
+
+## 📊 评估结果
+
+**这些数字由 `backend/scripts/eval.py` 真实跑出，可一键复现**（40 条人工核验查询，真连本机 PostgreSQL + SiliconFlow）：
+
+```bash
+cd backend
+.venv\Scripts\python.exe -m scripts.eval --mode all
+```
+
+**实测环境**：本机 Docker Postgres 16 + pgvector（372 道菜、372 卡片向量、3,806 步骤向量）+ SiliconFlow `BAAI/bge-m3` / `BAAI/bge-reranker-v2-m3`（`provider_stats` 中 `degraded_calls = 0`，即**全部走远端、无降级污染**）。三组统一取 **Top50 候选池**，指标只在前 5 / 前 10 上截断。
+
+| 模式 | Recall@5 | Recall@10 | MRR@10 | nDCG@5 | 延迟中位数 | P95 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 纯向量 | **63.75%** | 72.08% | **74.00%** | **63.09%** | 152 ms | 859 ms |
+| 混合（向量 + BM25 + RRF） | 61.25% | 68.75% | 70.86% | 59.82% | 151 ms | 446 ms |
+| 混合 + 重排 | 64.17% | **77.50%** | 67.81% | 59.49% | 765 ms | 985 ms |
+
+> ⚠️ **`vector` 与 `hybrid` 两行是确定值（同输入必得同结果，中间没有非确定性组件）；只有 `hybrid_rerank` 与所有延迟会抖。**
+> **原因**：远端 bge-reranker 的服务端打分对同一输入并非逐位确定。**同一语料、同一脚本连跑 3 次**的实测极差为
+> R@5 0.00pp、R@10 0.83pp、MRR 0.0041、nDCG@5 0.0025（R@10 在 77.50% / 78.33% / 78.33% 之间跳）。
+> 所以重排那一行请读作 **R@5 64.2% / R@10 77.5–78.3%**，**不要把小数位当精度**。
+> 延迟更要当心：n=40 时 **P95 基本由单个离群点决定**（`vector` p95 859 ms 就是某一条 956 ms 拉出来的，
+> 它的中位数只有 152 ms）。所以延迟**只用于三组之间的相对比较**，不要当 SLA。
+> 复现时请检查报告的 `provider_stats.degraded_calls`：若不为 0，说明该次跑被降级污染，数字不可比。
+
+> ⚠️ **这里最重要的结论是「混合检索没有赢」——而且我们把它原样写出来，没有为了简历去调参凑一个更好看的数。**
+
+### 结论一：重排只在 Recall@10 上有确定收益
+
+`hybrid_rerank` 相对 `hybrid`：**Recall@10 +8.75pp**（68.75% → 77.50%）。**重排确实把真正相关的菜从池子中后段捞进了前 10。**
+
+但要说全：它在 Recall@5（64.17% vs 63.75%，仅 +0.42pp）、MRR@10（67.81% vs 74.00%）、nDCG@5（59.49% vs 63.09%）上**仍然不如纯向量**。所以准确表述是「**重排修好了召回广度，但没有修好头部精度**」。
+
+### 结论二：等权 RRF 是个结构性缺陷，不是「BM25 有噪声」（**负面结论，也是本次最有价值的发现**）
+
+`hybrid` 比纯向量**全面更差**（R@5 −2.50pp、R@10 −3.33pp、MRR −3.14pp、nDCG@5 −3.27pp）。
+
+**根因（已用逐条三元组定位，不是猜测）**：我一开始以为是「BM25 把垃圾顶进头部」，**这个猜测被数据否定了**。真实机制是一个**纯结构性的不等式**：
+
+```
+等权 RRF，k = 60，候选池 Top50
+  单通道项上界 = 1/(60+1)  = 0.016393   ← 只被一路召回，哪怕它排第 1
+  双通道项下界 = 2/(60+50) = 0.018182   ← 两路都召回，哪怕两路都排第 50
+  0.018182 > 0.016393  ⇒  恒成立
+```
+
+**只要一道菜两路都进了 Top50，它必然排在所有单通道候选之前**——哪怕它两路都排第 50，也压过某一路的第 1 名。
+
+**7 条回归查询、21 个金标准条目的通道来源**：**双通道 7 / 仅向量 13 / 仅 BM25 0 / 两路均未召回 1**。拉开差距的正是**「仅向量」那 13 个**：向量明明把它们排得很靠前，却因为 BM25 没召回它们，被整片「双通道共识集合」压到后面：
+
+| 查询 | 金标准 | 向量名次 | BM25 名次 | RRF 名次 | R@5 变化 |
+| --- | --- | --- | --- | --- | --- |
+| 家里只剩鸡蛋和番茄 | 西红柿炒鸡蛋 | **1** | 未召回 | **22** | 0.667 → 0.000 |
+| 家里只剩鸡蛋和番茄 | 西红柿鸡蛋汤 | **2** | 未召回 | **23** | |
+| 想吃川菜，要麻辣一点 | 麻婆豆腐 | **3** | 未召回 | **17** | 0.667 → 0.333 |
+| 想用烤箱做点甜点 | 戚风蛋糕 | **1** | 未召回 | **21** | 0.333 → 0.000 |
+| 第二天想带饭，做个凉拌菜 | 凉拌莴笋 | **2** | 未召回 | 4 | 0.667 → 0.333 |
+
+7 条回归查询的 Top10 里 **62/70（88.6%）是双通道共识项**；全量 40 条的 Top5 里双通道占 **92.5%**、Top10 占 **86.5%**（而 BM25-only 全程只贡献了 11/400 个位置）。
+
+**所以准确的结论是**：混合检索的伤害**不是**「BM25 把垃圾顶上来」，而是 **「RRF 只用名次、完全不看通道可靠性」**——BM25 任何一次命中都会把该菜**升格为「共识项」并获得永久优先权**，于是向量单独召回的真值被整体降级。**在 BM25 召回率本就低的语料上，这等价于系统性惩罚向量通道。**
+
+**这是本次评估最有价值的产出**：它证明了「混合检索听起来更高级，但在具体语料上不一定更好」，也说明了**为什么消融实验是必要的**——如果只看「混合 + 重排」的最终数字（Recall@10 最高），会误以为两路都在贡献；拆开才知道**增益全部来自重排，RRF 那一步是负贡献**。
+
+分场景看（Recall@5）：
+
+| 查询类型 | 纯向量 | 混合 | 混合+重排 |
+| --- | --- | --- | --- |
+| 直接菜名（8 条） | 100.0% | 100.0% | 100.0% |
+| 食材组合（8 条） | 89.6% | 81.3% | **100.0%** |
+| 场景/耗时（8 条） | **20.8%** | 16.7% | **25.0%** |
+| 口味/菜系（8 条） | **50.0%** | 50.0% | 41.7% |
+| 工具/做法（8 条） | **58.3%** | 58.3% | 54.2% |
+
+### 结论三：权重敏感性实验——没有任何权重能全指标翻盘
+
+在评估脚本里本地实现加权 RRF（`w_vec/(k+r) + w_bm25/(k+r)`，`w_bm25=1.0` 时与 `rag.fusion.reciprocal_rank_fusion` 输出等价，有单测断言），6 个配置共用同一份候选，横向可比：
+
+| 配置 | Recall@5 | Recall@10 | MRR@10 | nDCG@5 | Top10 双通道占比 |
+| --- | --- | --- | --- | --- | --- |
+| `w_bm25 = 0.0`（= 纯向量） | **63.75%** | 72.08% | **0.7400** | **0.6309** | 52.0% |
+| `w_bm25 = 0.25` | 62.08% | **74.17%** | 0.7127 | 0.6082 | 73.3% |
+| `w_bm25 = 0.50` | 62.92% | 71.67% | 0.6935 | 0.6034 | 85.3% |
+| `w_bm25 = 1.0`（**当前实现**） | 61.25% | 68.75% | 0.7086 | 0.5982 | 87.3% |
+| `w_bm25 = 0.25` + 各通道只取 Top10 | 61.25% | 72.08% | 0.7325 | 0.6091 | 31.5% |
+| 等权 + 各通道只取 Top10 | 61.25% | 69.58% | 0.7132 | 0.5980 | 31.5% |
+
+**唯一严格单调的量是「Top10 里双通道共识项占比」：52.0% → 73.3% → 85.3% → 87.3%**——即 BM25 权重越大，头部越被「两路都命中」的菜占满，而向量单独召回的真值越靠后。
+
+**但必须诚实说：指标本身并不严格单调。** 例如 R@5 在 `w=0.5`（62.92%）反而略高于 `w=0.25`（62.08%），MRR 在 `w=0.5`（0.6935）反而低于 `w=1.0`（0.7086）。**40 条样本下 1pp 级别的跳动不能当结论**，所以这里只主张两件有把握的事：
+
+1. **没有一个权重能让所有指标都赢过纯向量。** `w=0.0` 拿下 R@5 / MRR / nDCG 三项；`w=0.25` 只在 R@10 上更好（74.17% vs 72.08%，+2.09pp），代价是 R@5 −1.67pp、MRR −2.73pp。
+2. **等权（`w=1.0`，也就是当前实现）在四个指标上有三个是最差的**，且头部被共识项占比最高的 87.3%，**没有任何理由保留它**。
+
+**另外两个反直觉的发现（都有数据支撑）**：
+
+1. **按召回深度归一（各通道只取 Top10）救不了场**：它把双通道集合从 349 项砍到 126 项、共识占比从 87.3% 压到 31.5%，**但 R@5 仍然是 61.25%，一点没变**；代价是把 26 个金标准踢出了候选池（`gold_not_recalled_in_top_n` 从 12 涨到 26），R@10 反而从 68.75% 升到 69.58% 又被截断吃掉。**结论：截断尾部换来的精度收益，被截断掉的召回损失完全抵消了**——想修 RRF 的头部，靠调召回深度是没用的，必须改融合公式。
+2. **`w_bm25 = 0.25` 是唯一在 R@10 上胜过纯向量的配置**。所以：**若产品必须保留关键词通道（精确菜名、生僻词兜底），0.25 是有依据的取值；若只追主指标，纯向量最好。**
+
+**当前代码仍用 `w_bm25 = 1.0`（等权），这是已知的、有证据的次优默认值**——改它属于 `rag/fusion.py` 的行为变更，登记在 [`docs/failed-features.md`](./docs/failed-features.md) F15，不在本轮范围内。**我没有为了简历好看去改这个默认值再重跑。**
+
+### 结论四：场景/耗时类查询是三组共同的短板（16.7%–25.0%）
+
+即使最好的配置也只有 Recall@5 = 25.0%。原因很直接：**上游 HowToCook 不提供烹饪时长**，`recipes.time_minutes` **372 行全为 NULL**；`recipes.tools` 只有 82 行非空。所以「十五分钟就能做好的快手菜」「家里只有空气炸锅」这类查询**在语料里根本没有可用的结构化信号**，只能靠菜名/步骤里偶然出现的词蒙。**这是数据缺口，不是检索算法问题——补算法补不上。**
+
+**这条正好说明消融的另一个价值**：它把「算法问题」和「数据问题」分开了。
+
+### 为什么 Recall@5 只有 63.75%，离 85% 差 21pp？
+
+**如实说：目标没达到，而且差距的主要来源不是排序算法。** 按贡献排序：
+
+1. **金标准集不完整（最大项）**：每条查询只标 1–3 个相关菜，而库里存在大量同样满足约束的合法答案。启发式估算显示 Top10 里「未标注但按查询自身约束看确实合法」的占比很高（若标注完整，precision@10 约为 54.6% / 56.2% / 65.8%），**所以 Recall 被系统性低估**。换言之：**指标偏低有一部分是标注问题，不是系统问题**——这是必须承认的方法论局限。
+2. **scene / taste 类缺结构化元数据**：见结论四。
+3. **剩下的才是排序算法问题。**
+
+**我们没有为了接近 85% 而调参或改标注。** 这份 README 早期版本曾写「Recall@5 ≥ 85%」——那是**没有测量支撑的目标值**，现已改成实测值加差距归因。
+
+### 复现与局限（必须同时说）
+
+- 复现命令与数据结构见 [`data/eval/queries.yaml`](./data/eval/queries.yaml)；报告（含每条查询的 `evidence_top10` / `channel_sources` / `latency_ms`）在 `data/eval/reports/*.json`。
+- **金标准已用脚本校验**：`python -m scripts.eval --validate-only` 会确认每一条标注的菜名都真实存在于库中（当前 40/40 通过；库中 372 行 / 371 个不同菜名，刻意排除同名重复的 `陈皮排骨汤`）。
+- **40 条是小样本**，只能做**相对比较**（哪组更好），不能当绝对质量结论；单条差异即可造成 1–2pp 波动。
+- **单人标注**，无标注者间一致性（Kappa）数据。
+- **相关度是二值**（相关 / 不相关），nDCG 里相关度都按 1 计，所以 nDCG 与 Recall 高度相关、信息量有重叠。
+- 未做显著性检验（小样本 + 单标注，做不了）。
+- 延迟在**本机 + Docker + 公网 SiliconFlow** 上测得，含网络往返；换机器 / 换网关数字会变。
+- ⚠️ **本表数字的"有效期"绑定在语料上**：改解析器 / 改切分 / 换 embedding 模型都会改变卡片文本 → 向量 → 排序。**每次重灌必须重跑 `scripts/build_index` 并全量重跑评估**，流程写在 [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md) §4.6。**本次数字就是重灌后的结果**（重灌前 `hybrid` R@5 是 59.58%，现在是 61.25%——不是回退，是卡片文本变干净了）。
+
+指标口径：
+
+- **Recall@k**：标注的相关菜谱里，有多少出现在 Top-k。
+- **MRR@10**：第一条命中的倒数排名均值。
+- **nDCG@5**：按位置折损的相关度增益，标注相关度视为 1。
+- **延迟**：单条查询的检索端到端耗时（含 embedding 与重排网络往返），**计时前各通道预热 1 次**（所以是热路径，不含连接池 / HTTP 建连）。用中位数与 P95 而非平均值——检索延迟是右偏分布，平均值会被长尾拉偏。
+
+### 端到端接口实测（`POST /recommend`，真机）
+
+**下表为 2026-10-11 数据重灌 + 重建索引后的最新一轮实测**（`.tmp/e2e_after_reload.txt` 留底）：
+
+| 场景 | 延迟 | 结果 |
+| --- | --- | --- |
+| `{"query":"西红柿炒鸡蛋"}` | **10.4 s** | 3 条推荐（西红柿炒鸡蛋 / 西红柿鸡蛋挂面 / 西葫芦炒鸡蛋），`node_path=[parse,search,generate,validate]`，`degraded=false` |
+| `{"query":"20 分钟能搞定的家常菜"}` | **2.0 s** | `recommendations=[]`，`no_solution_reason="no_candidates_under_constraints"`，`node_path=[parse,search,no_solution]` |
+| `{"query":"清淡的汤，不要辣"}` | **9.8 s** | 3 条推荐（金针菇汤 / 生汆丸子汤 / 朱雀汤），`degraded=true`，`degradations=["recommendation_shortfall"]`（LLM 只给了 2 条，第 3 条由候选按检索顺序补齐，**它的 `reason` 是规则模板**：`命中你的需求「…」的混合检索第 3 名结果`） |
+| `POST /recipes/search {"query":"有鸡蛋和番茄","top_k":5}` | **0.35 s** | 5 条候选（番茄牛肉蛋花汤 / 意式香肠北非蛋 / 罗宋汤 / 鸡蛋三明治 / 温泉蛋），`degraded=false` |
+| `{"query":""}` | **6 ms** | 422 + 统一错误信封（`query` 有 `min_length=1`） |
+
+> 上面第 3 行的 `reason` 是个**真实可讲的细节**：它暴露了两条不同的生成路径——LLM 正常返回的 2 条理由是人话，补齐的第 3 条是规则模板。这正是 `degraded=true` 想传达的信息，而不是把它藏起来。
+
+> ⚠️ **延迟 9–12 s 是当前实现最大的工程欠账**：`parse` 与 `generate` 是两次**串行** chat 调用（本次 parse + generate 合计 ≈ 10 s）。这不是检索慢（纯检索 0.35 s），而是 LLM 往返慢 + 串行。压到 3 s 内的做法（并发两次调用、或把 parse 换成规则/小模型）属于产品取舍，**当前没有做**，登记在 [`docs/failed-features.md`](./docs/failed-features.md) F14。
+
+---
 
 ## 🧱 技术栈
 
-| 层级                | 技术                                              | 版本锚定                |
-| ------------------- | ------------------------------------------------- | ----------------------- |
-| **AI 编排**   | LangGraph + LangChain                             | ≥ 0.2 / 0.3.x          |
-| **后端**      | FastAPI + Pydantic v2                             | 0.115+                  |
-| **数据库**    | PostgreSQL + pgvector                             | PG 16+ / pgvector 0.7+  |
-| **Embedding** | BGE-M3                                            | BAAI/bge-m3             |
-| **重排**      | bge-reranker-v2-m3                                | BAAI/bge-reranker-v2-m3 |
-| **LLM**       | DeepSeek / OpenAI 兼容 API                        | —                      |
-| **前端**      | Next.js 14 + TypeScript + Tailwind v4 + shadcn/ui | 14+                     |
-| **状态**      | TanStack Query + Zustand                          | v5                      |
-| **可观测**    | Langfuse + Sentry                                 | latest                  |
-| **评估**      | RAGAS                                             | latest                  |
-| **容器化**    | Docker + Docker Compose                           | —                      |
+只列**实际在用**的（`pip`/`npm` 里装了、代码里调了）：
+
+| 层级 | 技术 | 实际用途 |
+| --- | --- | --- |
+| **AI 编排** | LangGraph 1.2 + langchain-core | `backend/agents/` 的状态机闭环 |
+| **后端** | FastAPI 0.115+ + Pydantic v2 | 分层 API + 配置 + 错误信封 |
+| **数据库** | PostgreSQL 16 + pgvector 0.8 | 13 张表、HNSW 向量索引、GIN tsv 索引 |
+| **Embedding** | BAAI/bge-m3（SiliconFlow / 本地兜底） | 1024 维，卡片级 + 步骤级 |
+| **重排** | BAAI/bge-reranker-v2-m3 | RRF 之后二次排序，失败降级回 RRF |
+| **LLM** | DeepSeek-V3（OpenAI 兼容） | 查询解析 + 推荐理由生成，温度 0.1 |
+| **ORM / 迁移** | SQLAlchemy 2.x（async）+ Alembic | `infra/tables.py` 是 schema 唯一事实源 |
+| **中文检索** | jieba + rank-bm25 | tsv 与 BM25 共用同一分词入口 |
+| **可观测** | Langfuse（Cloud，日本区） | 观察名是契约常量；key 缺失降级为本地日志 |
+| **前端** | Next.js 14 App Router + TS strict + Tailwind v4 | Natural Organic token 写在 `@theme`，无 `tailwind.config.js` |
+| **前端状态** | TanStack Query（服务端状态）+ Zustand（UI 状态） | 两者严格分离，不混用 |
+| **容器化** | Docker Compose | `postgres` + `redis` 默认起；`app` profile 挂前后端 |
+
+**已规划但尚未引入**（写在前面的技术栈清单里、代码里还没用，不计入"在用"）：
+
+| 技术 | 计划用途 | 现状 |
+| --- | --- | --- |
+| RAGAS | 生成侧四项指标（Faithfulness / Answer Relevancy / Context Precision / Context Recall） | 未安装、未使用 |
+| Sentry | 异常上报 | 配置项已留，未接入 |
+| Redis | 限流与缓存 | 容器已起，代码未用 |
+| shadcn/ui | 组件库 | 未初始化，当前是手写 Tailwind |
+| PostgresSaver | 会话状态持久化 | 表和依赖已就位，图未接线 |
 
 > 完整技术栈清单与 AI 编码约束见 [`docs/TECH_STACK.md`](./docs/TECH_STACK.md)。
+
+---
 
 ## 🧭 全局约定（唯一口径）
 
@@ -64,140 +269,154 @@ MealCompass 是一个面向**所有做饭的普通人**的智能菜谱推荐 Age
 
 | 议题 | 统一结论 |
 | ---- | -------- |
-| **登录** | 邮箱 + 密码 + JWT（注册 / 登录 / 登出 / 刷新）；**不做第三方 OAuth** |
+| **登录** | 邮箱 + 密码 + JWT（注册 / 登录 / 登出 / 刷新）；**不做第三方 OAuth**。🚧 未实现 |
 | **目标用户** | **面向所有普通人，不做医学人群细分**（GI / 钠 / 蛋白质等医学营养数据不可得）。约束只来自用户自己的忌口、时间、厨具与口味 |
 | **画像归属** | `backend/domain/profiles/`（`domain` 是唯一无 IO 层） |
-| **接口定义** | 所有 Protocol 集中在 `domain/ports.py`（`RecipeRepository` / `Retriever` / `LLMClient`），实现在 `infra/`、`rag/` |
+| **接口定义** | 所有 Protocol 集中在 `domain/ports.py`（`RecipeRepository` / `LLMClient` / `EmbeddingClient` / `RerankClient` / `Retriever`），实现在 `infra/`、`rag/` |
 | **前端目录** | 不使用 `src/` 前缀：`app/`、`components/ui/`、`lib/` 直接放在 `frontend/` 下 |
 | **渲染策略** | 推荐 / 对话 / 购物清单 = CSR（client + TanStack Query）；落地页 / 菜谱详情 / legal = Server Component（SSR） |
-| **样式** | Natural Organic（`docs/UI_STYLE.md`）；Tailwind v4 CSS-first，token 定义在 `app/globals.css` 的 `@theme`，不生成 `tailwind.config.js`；shadcn/ui 主题必须映射到该调色板 |
-| **数据源** | 菜谱来自 HowToCook（Unlicense / 公有领域，可自由分发与商用）。372 道菜谱 + 354 张成品配图已收录进 `data/raw/howtocook/` 并随仓库提交；上游完整 clone（623 MB）不入库 |
-| **模型调用** | **远程优先、本地兜底**：Embedding / Rerank 默认走 SiliconFlow、DeepSeek 等 OpenAI 兼容接口，失败或离线时回落 Ollama / sentence-transformers 本地推理；实现在 `infra/`，接口在 `domain/ports.py`，trace 里标注实际走的是哪条路 |
-| **会话存储** | `PostgresSaver` 是会话状态唯一事实源；Redis 只做缓存与限流 |
-| **规则** | YAML 文件（`data/rules/`），不入库，可版本控制 |
-| **可观测** | Langfuse Cloud 免费版（日本区，Python SDK v4.17+）+ Sentry；未配置 key 时自动降级为本地结构化日志；**读取 trace 走 `/api/public/v2/observations`**（旧 `/api/public/traces` 对 2026-09-16 后新建的组织返回 410） |
-| **评估** | `scripts/eval.py` 手动跑；稳定后再入 CI，MVP 阶段不进必跑流水线 |
-| **语音** | Web Speech API（客户端） |
-| **工期** | 总计 4-6 周（单人全职）：M1 1-1.5 周 / M2 1.5-2 周 / M3 1-1.5 周 / M4 0.5-1 周 |
+| **样式** | Natural Organic（`docs/UI_STYLE.md`）；Tailwind v4 CSS-first，token 定义在 `app/globals.css` 的 `@theme`，不生成 `tailwind.config.js` |
+| **数据源** | 菜谱来自 HowToCook（Unlicense / 公有领域，可自由分发与商用）。372 道菜谱 + 354 张成品配图收录进 `data/raw/howtocook/` 并随仓库提交；上游完整 clone（623 MB）不入库 |
+| **模型调用** | **远程优先、本地兜底**：Embedding / Rerank 默认走 SiliconFlow 等 OpenAI 兼容接口，失败或离线时回落本地推理；实现在 `infra/`，接口在 `domain/ports.py`，trace 里标注实际走的是哪条路。⚠️ 本地兜底需装 `sentence-transformers`，**当前环境未安装** |
+| **硬约束归属** | 忌口 / 时间 / 厨具**下推到检索层**（SQL WHERE / 向量过滤），禁止「先检索再过滤」；LLM 不参与硬约束判定 |
+| **无解语义** | 硬约束下无候选时，**显式返回 `no_solution_reason`**，绝不返回违规菜谱、绝不编造 |
+| **时长的现状** | ⚠️ 上游 HowToCook **不提供**烹饪时长，`recipes.time_minutes` 372 行**全为 NULL**。因此设置了 `max_time_minutes` 时，严格语义会排除所有菜谱。这是"不编造数据"的代价，已在 `docs/failed-features.md` 登记 |
+| **会话存储** | `PostgresSaver` 是会话状态唯一事实源；Redis 只做缓存与限流。🚧 未接线 |
+| **规则** | YAML 文件（`data/rules/`），不入库，可版本控制。🚧 目录尚未创建 |
+| **可观测** | Langfuse Cloud 免费版（日本区，Python SDK v4.17+）；未配置 key 时自动降级为本地结构化日志；**读取 trace 走 `/api/public/v2/observations`**（旧 `/api/public/traces` 对新组织返回 410） |
+| **评估** | `scripts/eval.py` 手动跑；稳定后再入 CI。**指标只写实测值，不写目标值** |
+| **语音** | Web Speech API（客户端）。📋 未开始 |
+| **工期** | 原计划 4-6 周；**2026-10-11 起收敛为 3 周聚焦核心 Agent 闭环**（详见 [路线图](#-路线图)） |
 
-**文档地图**：`README.md`（本文件）· `docs/PRD.md` · `docs/TECH_STACK.md` · `docs/ARCHITECTURE.md` · `docs/CONVENTIONS.md` · `docs/UI_STYLE.md` · `docs/API.md`（自动生成）· `TODO.md`
+**文档地图**：`README.md`（本文件）· `docs/PRD.md` · `docs/TECH_STACK.md` · `docs/ARCHITECTURE.md` · `docs/CONVENTIONS.md` · `docs/UI_STYLE.md` · `docs/DATA_SOURCES.md` · `docs/INTERVIEW.md`（面试深挖问答）· `TODO.md` · `docs/failed-features.md` · `docs/mistakes.md`
+
+---
 
 ## 🏗️ 架构概览
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                      前端 (Next.js)                      │
-│  /recommend  /chat  /recipe  /cook  /shopping  /profile │
+│      / (落地页)    /recommend (推荐)    /dashboard       │
 └──────────────────────────┬──────────────────────────────┘
                            │ HTTP / JSON
 ┌──────────────────────────▼──────────────────────────────┐
 │                    API 层 (FastAPI)                      │
-│  api/v1: auth / profile / recommend / recipe / shopping │
+│        /health  /version  /recommend  /recipes/search   │
 └──────────────────────────┬──────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────┐
 │                   Service 层 (业务编排)                   │
-│  AuthService / ProfileService / RecommendService / ...  │
+│              RecommendService（根 trace）                │
 └───────┬──────────────────┬──────────────────┬───────────┘
         │                  │                  │
 ┌───────▼──────┐  ┌────────▼────────┐  ┌─────▼──────────┐
 │   Domain     │  │     Agents      │  │      RAG       │
-│  规则引擎    │  │  LangGraph 编排  │  │  混合检索+重排  │
-│  用户画像    │  │  工具注册表      │  │  切分/索引      │
+│ 引用校验      │  │  LangGraph 闭环  │  │  混合检索+重排  │
+│ 食材归一化    │  │  parse/search/  │  │  切分/索引      │
+│ 领域模型      │  │  generate/      │  │  RRF 融合       │
+│              │  │  validate       │  │                │
 └───────┬──────┘  └────────┬────────┘  └─────┬──────────┘
         │                  │                  │
 ┌───────▼──────────────────▼──────────────────▼───────────┐
-│              Infra 层 (DB / LLM / Redis / 观测)          │
-│  PostgreSQL + pgvector  |  LLM Client  |  Langfuse      │
+│              Infra 层 (DB / LLM / 观测)                  │
+│  PostgreSQL + pgvector | LLMClient | Embedding | Rerank │
+│                Langfuse | 配置 | 结构化日志              │
 └─────────────────────────────────────────────────────────┘
 ```
 
 **分层依赖规则**：`api → services → domain / agents / rag → infra`，单向不可逆，`domain` 不依赖任何层。
+
+**Agent 闭环（当前实现的最小版）**：
+
+```
+START → parse ──▶ search ──┬─(0 候选)─▶ no_solution ─▶ END
+                           └─(有候选)─▶ generate ─▶ validate ─▶ END
+```
+
+- `parse`：LLM 把自然语言翻译成硬约束；**解析失败降级为"用原查询、不加约束"**，不中断。
+- `search`：硬约束下推到 SQL，向量与 BM25 各自在允许集合内召回，RRF 融合，可选重排。
+- `generate`：LLM 只从候选里挑，输出 JSON；**解析失败降级为规则模板生成**。
+- `validate`：`domain/citations.py` 校验每个 `recipe_id` 必须精确命中候选，不符的丢弃。
+
+> 详细架构说明见 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)。
+
+---
 
 ## 📁 目录结构
 
 ```
 mealcompass/
 ├── backend/
-│   ├── api/                  # 路由层
+│   ├── api/                  # 路由层（薄路由，≤10 行）
 │   ├── services/             # 业务编排
-│   ├── domain/               # 领域层（模型、规则、画像）
-│   ├── agents/               # LangGraph 节点与工具
-│   ├── rag/                  # 检索、重排、切分、索引
-│   ├── infra/                # DB、LLM、Redis、观测
-│   ├── core/                 # 配置、日志、安全
-│   ├── scripts/              # 种子数据、建索引、评估
-│   ├── tests/
-│   ├── main.py
-│   └── Dockerfile
+│   ├── domain/               # 领域层（模型、引用校验、食材归一化、Protocol）
+│   ├── agents/               # LangGraph 状态机与节点
+│   ├── rag/                  # 检索、重排、切分、融合、分词
+│   ├── infra/                # DB、LLM/Embedding/Rerank 客户端、观测
+│   ├── core/                 # 配置、日志、异常
+│   ├── scripts/              # 导入、入库、建索引、评估、冒烟
+│   ├── tests/                # 单测 + 集成测试
+│   ├── migrations/           # Alembic
+│   └── main.py
 ├── frontend/
 │   ├── app/                  # Next.js App Router
 │   ├── components/           # UI 组件
-│   ├── lib/                  # API 客户端、stores、hooks
-│   └── Dockerfile
+│   └── lib/                  # API 客户端、query client、hooks、stores
 ├── data/
-│   ├── recipes/              # 原始菜谱 JSON
-│   ├── rules/                # 规则 YAML（可热更新）
-│   └── eval/                 # 评估集
-├── docs/                     # 文档（PRD / 技术栈 / 架构 / 规范 / UI 风格）
+│   ├── raw/howtocook/        # 上游原始 markdown + 配图（只读）
+│   ├── recipes/              # 解析产物（gitignore，可重建）
+│   ├── ingredients/          # 食材归一化词典
+│   └── eval/                 # 评估集与报告
+├── docs/                     # PRD / 技术栈 / 架构 / 规范 / UI / 面试问答
 ├── docker-compose.yml
 └── README.md
 ```
 
-> 详细架构说明见 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)。
+---
 
 ## 🚀 快速开始
 
 ### 前置要求
 
 - Docker & Docker Compose
-- Python 3.11+（本地开发）
-- Node.js 20+（本地开发）
-- 一个 OpenAI 兼容的 API Key（推荐 DeepSeek）
+- Python 3.11+ 与 [`uv`](https://docs.astral.sh/uv/)
+- Node.js 20+ 与 `pnpm`
+- 一个 OpenAI 兼容的 API Key（推荐 [SiliconFlow](https://siliconflow.cn)，本项目的 embedding / rerank / chat 都在它上面实测过）
 
-### 一键启动（Docker Compose）
+### 一键启动依赖 + 建库 + 灌数据
 
 ```bash
-# 克隆仓库
-git clone https://github.com/yourname/mealcompass.git
-cd mealcompass
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env，填入 LLM_API_KEY 等
-
-# 启动依赖（postgres + redis）
-# backend / frontend 在 app profile 下，等各自 Dockerfile 就绪后：docker compose --profile app up -d
+# 1. 起依赖（postgres + redis）
 docker compose up -d
 
-# 建表（Alembic，schema 事实源是 backend/infra/tables.py）
-cd backend && .venv/Scripts/python.exe -m alembic upgrade head && cd ..
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑 .env，填入 LLM_API_KEY 等（不填也能跑，只是没有 LLM 与 trace）
 
-# 解析原始数据并灌库（幂等，可重复跑）
+# 3. 后端依赖
 cd backend
-.venv/Scripts/python.exe -m scripts.import_howtocook   # HowToCook markdown -> JSON
-.venv/Scripts/python.exe -m scripts.seed_recipes        # JSON + 食材词典 -> PostgreSQL
-.venv/Scripts/python.exe -m scripts.build_index         # 建双层向量索引（T1.6，幂等可重跑）
-cd ..
+uv sync --extra dev
+
+# 4. 建表
+.venv/Scripts/python.exe -m alembic upgrade head     # Windows
+# .venv/bin/python -m alembic upgrade head           # macOS / Linux
+
+# 5. 解析原始数据并灌库（幂等，可重复跑）
+.venv/Scripts/python.exe -m scripts.import_howtocook  # markdown → JSON
+.venv/Scripts/python.exe -m scripts.seed_recipes      # JSON + 食材词典 → PostgreSQL
+.venv/Scripts/python.exe -m scripts.build_index       # 双层向量索引（372 卡片 + 3806 步骤）
+
+# 6. 起后端
+.venv/Scripts/python.exe -m uvicorn main:app --reload
 ```
 
 访问：
 
-- 前端：http://localhost:3000
 - 后端 API 文档：http://localhost:8000/docs
-- Langfuse：http://localhost:3001
+- 健康检查：http://localhost:8000/health
 
-### 本地开发
-
-**后端**：
-
-```bash
-cd backend
-uv sync
-uv run uvicorn main:app --reload
-```
-
-**前端**：
+### 前端
 
 ```bash
 cd frontend
@@ -205,96 +424,129 @@ pnpm install
 pnpm dev
 ```
 
-## 🔧 环境变量
+访问 http://localhost:3000 ，推荐页在 `/recommend`。
 
-| 变量                    | 说明              | 示例                                                          |
-| ----------------------- | ----------------- | ------------------------------------------------------------- |
-| `DATABASE_URL`        | PostgreSQL 连接串 | `postgresql+asyncpg://user:pass@localhost:5432/mealcompass` |
-| `REDIS_URL`           | Redis 连接串      | `redis://localhost:6379/0`                                  |
-| `LLM_API_KEY`         | LLM API Key       | `sk-...`                                                    |
-| `LLM_BASE_URL`        | LLM 兼容接口      | `https://api.deepseek.com`                                  |
-| `LLM_MODEL`           | 模型名            | `deepseek-chat`                                             |
-| `EMBEDDING_MODEL`     | Embedding 模型    | `BAAI/bge-m3`                                               |
-| `RERANKER_MODEL`      | 重排模型          | `BAAI/bge-reranker-v2-m3`                                   |
-| `LANGFUSE_PUBLIC_KEY` | Langfuse 公钥     | —                                                            |
-| `LANGFUSE_SECRET_KEY` | Langfuse 私钥     | —                                                            |
-| `SENTRY_DSN` | 异常上报（可选） | — |
-| `JWT_SECRET`          | JWT 密钥          | —                                                            |
-| `NEXT_PUBLIC_API_BASE_URL` | 前端访问的后端基址（唯一暴露给浏览器的变量） | `http://localhost:8000`（默认值，可留空） |
-
-> 完整变量见 `.env.example`（前端为 `frontend/.env.example`）。
-
-## 📊 评估指标
-
-| 维度     | 指标                    | 目标值            |
-| -------- | ----------------------- | ----------------- |
-| 检索     | Recall@5 / nDCG@5       | ≥ 85% / ≥ 0.8   |
-| 生成     | 引用准确率 / 约束满足率 | ≥ 95% / 100%     |
-| Agent    | 任务成功率 / 工具准确率 | ≥ 90% / ≥ 95%   |
-| 性能     | P95 延迟 / Token 成本   | ≤ 3s / ≤ ¥0.05 |
-| 工程质量 | 单元测试覆盖率          | ≥ 70%            |
-
-运行评估：
+### 跑评估（三组消融）
 
 ```bash
-docker compose exec backend python scripts/eval.py
+cd backend
+.venv/Scripts/python.exe -m scripts.eval --mode all
 ```
 
-结果将输出到终端并同步至 Langfuse。
+---
+
+## 🔧 环境变量
+
+| 变量 | 说明 | 示例 |
+| --- | --- | --- |
+| `DATABASE_URL` | PostgreSQL 连接串 | `postgresql+asyncpg://mealcompass:mealcompass@localhost:5432/mealcompass` |
+| `REDIS_URL` | Redis 连接串（当前代码未使用） | `redis://localhost:6379/0` |
+| `LLM_API_KEY` | LLM / Embedding / Rerank 的 API Key | `sk-...` |
+| `LLM_BASE_URL` | OpenAI 兼容接口基址 | `https://api.siliconflow.cn/v1` |
+| `LLM_MODEL` | Chat 模型名 | `deepseek-ai/DeepSeek-V3` |
+| `EMBEDDING_MODEL` | Embedding 模型（须为 1024 维） | `BAAI/bge-m3` |
+| `RERANKER_MODEL` | 重排模型 | `BAAI/bge-reranker-v2-m3` |
+| `EMBEDDING_API_KEY` / `EMBEDDING_BASE_URL` | 可选：embedding / rerank 单独走别的网关 | — |
+| `ENABLE_LOCAL_FALLBACK` | 是否启用本地兜底（需装 `sentence-transformers`） | `true` |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` | Langfuse 凭证（可留空，自动降级） | — |
+| `JWT_SECRET` | JWT 密钥（`APP_ENV=prod` 时必填，否则启动即失败） | — |
+| `NEXT_PUBLIC_API_BASE_URL` | 前端访问的后端基址（唯一暴露给浏览器的变量） | `http://localhost:8000` |
+
+> 完整变量见 `.env.example` 与 `frontend/.env.example`。
+
+---
 
 ## 🧪 测试
 
 ```bash
-# 后端单元测试
+# 后端：Lint + 格式化 + 测试（覆盖率只统计生产代码）
 cd backend
-uv run pytest --cov=.
+.venv/Scripts/python.exe -m ruff check .
+.venv/Scripts/python.exe -m ruff format --check .
+.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider \
+  --cov=domain --cov=rag --cov=infra --cov=core --cov=api \
+  --cov=agents --cov=services --cov=main --cov-fail-under=70
 
 # 前端：类型检查 + Lint + 构建
 cd frontend
 pnpm typecheck && pnpm lint && pnpm build
-
-# 后端 Lint
-uv run ruff check . && uv run ruff format --check .
 ```
 
-## 📚 文档索引
+**覆盖率口径说明**：只统计生产代码（`domain/rag/infra/core/api/agents/services/main.py`），**不把 `tests/` 与 `scripts/` 算进去**——否则覆盖率会被测试自身稀释。门禁 `--cov-fail-under=70`。
 
-| 文档                                              | 说明                                   |
-| ------------------------------------------------- | -------------------------------------- |
-| [`docs/PRD.md`](./docs/PRD.md) | 产品需求文档（功能列表、验收标准） |
-| [`docs/TECH_STACK.md`](./docs/TECH_STACK.md) | 技术栈清单与 AI 编码约束 |
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | 架构草案（分层、模块、数据模型） |
-| [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md) | 开发规范（分层 / 测试 / CI / Git） |
-| [`docs/UI_STYLE.md`](./docs/UI_STYLE.md) | 前端 UI 风格（Natural Organic） |
-| [`docs/API.md`](./docs/API.md) | API 文档（由 FastAPI OpenAPI 自动生成） |
-| [`TODO.md`](./TODO.md) | 待办与排期（决策项 / 里程碑 / 验收标准） |
-| [`docs/failed-features.md`](./docs/failed-features.md) | 未完成功能与环境受限项登记（不假装可用） |
+**本机实测（2026-10-11，重灌数据后 / 补齐覆盖率测试后）**：
+
+```
+$ .venv\Scripts\python.exe -m pytest -q -p no:cacheprovider --cov=domain --cov=rag --cov=infra \
+    --cov=core --cov=api --cov=agents --cov=services --cov=main --cov-report=term
+TOTAL                              1669     66    96%
+491 passed, 4 skipped in 53.69s
+$ .venv\Scripts\python.exe -m ruff check .          → All checks passed!
+$ .venv\Scripts\python.exe -m ruff format --check . → 86 files already formatted
+```
+
+覆盖率**最低的三个模块也一并说清，不藏**（补齐前的旧值 → 现在）：
+
+| 模块 | 补齐前 | 现在 | 说明 |
+| --- | --- | --- | --- |
+| `infra/db.py` | 64% | **100%** | `create_async_engine` 是**惰性**的，单测不需要真库；用假 session 覆盖了 commit / rollback / 建连失败三条分支 |
+| `infra/observability.py` | 75% | **94%** | 注入假 langfuse 模块覆盖「启用路径」；剩下 6 行是 SDK 真发请求后的分支 |
+| `api/deps.py` | 80% | **100%** | 装配链（engine → corpus → retriever → service）+ 关闭失败只记日志的分支 |
+
+> `4 skipped` 是**环境性跳过**（本地兜底模型 `sentence-transformers` 未安装、真远程 smoke 需 key），不是失败；每一条的跳过原因写在测试里。
+
+沙箱环境跑测试的两条规矩：`$env:TEMP` 指到仓库内、不要用 `tmp_path` fixture（见 `AGENTS.md` §5.1）。
+
+---
 
 ## 🗺️ 路线图
 
-| 阶段 | 周期   | 交付                                         |
-| ---- | ------ | -------------------------------------------- |
-| M1   | 1-1.5 周 | 知识库 + 基础 RAG + 前后端骨架 |
-| M2   | 1.5-2 周 | 规则引擎（通用约束）+ LangGraph Agent + 评估集 |
-| M3   | 1-1.5 周 | 购物清单 / 烹饪模式 / 部署 / Langfuse |
-| M4   | 0.5-1 周 | README + 架构图 + Demo 视频 + 简历打磨 |
+**2026-10-11 起收敛为 3 周聚焦**（原 4-6 周全量计划见 `TODO.md` 归档区）：
 
-> **总工期 4-6 周（单人全职）**：与 `TECH_STACK.md` 的选型前提一致。时间不足时优先砍 M3 的 P1 项，**评估与部署不可省**。
+| 周 | 目标 | 出口条件 |
+| --- | --- | --- |
+| **Week 1** | 评估与安全基线 | ✅ 40 条评估集 + 三组消融实测数字；✅ 引用校验接入闭环 |
+| **Week 2** | Agent 后端闭环 | ✅ `parse → search → generate → validate` 真机跑通；✅ 无解显式返回；✅ 降级路径有测试 |
+| **Week 3** | 演示、证据与求职材料 | ✅ `/recommend` 页面可用；✅ README 数字全部可复现；✅ 面试问答方案（`docs/INTERVIEW.md`） |
+
+**明确不做**（三周内）：注册登录、购物清单、一周菜单、烹饪模式、语音、长期记忆、多智能体、付费。
+
+> 依据：Agent 后端实习岗最看重的是"**一条能讲透的完整链路 + 可测量的证据**"，而不是页面数量。
+
+---
+
+## 📚 文档索引
+
+| 文档 | 说明 |
+| --- | --- |
+| [`docs/PRD.md`](./docs/PRD.md) | 产品需求文档（功能列表、验收标准） |
+| [`docs/TECH_STACK.md`](./docs/TECH_STACK.md) | 技术栈清单与 AI 编码约束 |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | 架构（分层、模块、数据模型、接口） |
+| [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md) | 开发规范（分层 / 测试 / CI / Git） |
+| [`docs/UI_STYLE.md`](./docs/UI_STYLE.md) | 前端 UI 风格（Natural Organic） |
+| [`docs/DATA_SOURCES.md`](./docs/DATA_SOURCES.md) | 数据来源、字段与许可 |
+| [`docs/INTERVIEW.md`](./docs/INTERVIEW.md) | **面试深挖问答方案**（每个技术点的问题、答案、与代码位置） |
+| [`docs/failed-features.md`](./docs/failed-features.md) | 未完成功能与环境受限项登记（不假装可用） |
+| [`docs/mistakes.md`](./docs/mistakes.md) | 踩坑与解决过程记录 |
+| [`TODO.md`](./TODO.md) | 待办与排期 |
+
+---
 
 ## 🤝 贡献指南
 
 1. Fork 本仓库
 2. 创建功能分支 `git checkout -b feature/xxx`
-3. 提交前确保 `pytest` 与 `ruff` 通过
+3. 提交前确保 `ruff`、`pytest`、`pnpm typecheck && pnpm lint && pnpm build` 全绿
 4. 提交 PR，描述变更内容与原因
-5. 架构变更需同步更新 `docs/ARCHITECTURE.md` 的迭代日志
+5. 行为变更必须同步更新文档与 `docs/mistakes.md`
+
+---
 
 ## 📄 许可证
 
-[MIT](./LICENSE)
+本项目代码采用 [MIT](./LICENSE)。
+菜谱数据来自 [HowToCook](https://github.com/Anduin2017/HowToCook)，其许可为 **Unlicense（公有领域）**，可自由分发与商用。
 
 ---
 
 **⚠️ 免责声明**：MealCompass 提供的推荐仅供参考，不构成医疗或营养建议。有特殊饮食需求者请咨询专业人士。
-
-**🙏 数据来源**：菜谱数据来自开源数据集（HowToCook、Food.com 等），已标注来源，遵守相应许可证。

@@ -1,8 +1,46 @@
 # MealCompass 待办清单
 
 > 文档来源：`README.md`、`docs/PRD.md`、`docs/TECH_STACK.md`、`docs/ARCHITECTURE.md`、`docs/CONVENTIONS.md`、`docs/UI_STYLE.md`
-> 更新：2026-10-09 ｜ 状态：**跨文档冲突已全部统一**（结论见 §1 与 §9）；M1 前后端骨架（T1.17/T1.18）已完成
+> 更新：2026-10-11 ｜ 状态：**已收敛为「三周核心 Agent 闭环」计划（见 §0.5）**；M1 检索基础 + Agent 最小闭环已落地，实测数字见 `README.md` 的「评估结果」
 > 标记：`[MVP]` 必须做 ｜ `[P1]` 时间允许必做 ｜ `[P2]` 写入「未来工作」
+
+---
+
+## 0.5 三周聚焦计划（2026-10-11 起，**当前唯一口径**）
+
+> **背景**：原计划是 4-6 周的全量产品（7 节点 Agent、5 个工具、11 个页面、鉴权、购物清单……）。
+> 评估结论：**核心 Agent 链路当时一行代码都没有**，而检索链路已经做扎实。
+> 对「Agent 后端实习」这个目标来说，**一条能讲透的完整链路 + 可测量的证据**远比页面数量值钱。
+> 因此收敛范围：**砍掉一切外围，只做 Agent 闭环 + 评估 + 一个能演示的页面。**
+
+**优先级**：核心 Agent 闭环 > 评估与可观测 > 最小演示 > 外围功能。
+
+| 周 | 目标 | 出口条件（可验证） | 状态 |
+| --- | --- | --- | --- |
+| **W1** | 评估与安全基线 | 40 条人工核验评估集落盘；纯向量 / 混合 / 混合+重排三组消融**实测数字**；引用校验接入闭环 | ✅ 已完成 |
+| **W2** | Agent 后端闭环 | `parse → search →（无解短路）→ generate → validate` 真机跑通；无解显式返回；降级路径有测试 | ✅ 已完成 |
+| **W3** | 演示、证据与求职材料 | `/recommend` 页面可用；README 数字全部可复现；`docs/INTERVIEW.md` 面试问答方案 | ✅ 已完成 |
+
+**范围内（必须做）——全部完成，逐项打勾并附证据**
+
+- [X] **W1.1 评估集**：`data/eval/queries.yaml`（40 条 = 5 类 × 8 条，标注均为库里真实菜名；`--validate-only` 40/40 通过）
+- [X] **W1.2 评估脚本**：`backend/scripts/eval.py`（537 行，`--mode vector|hybrid|hybrid_rerank|weight|all` + `--validate-only`），Recall@5 / Recall@10 / MRR@10 / nDCG@5 + 延迟，指标函数 31 项单测
+- [X] **W1.3 消融实验**：三组真实数字写入 README（纯向量 63.75% / 混合 61.25% / 混合+重排 64.17% R@5），**并追加 6 档权重敏感性消融**
+- [X] **W1.4 引用校验接入**：`domain/citations.py` 从"死代码"变成闭环里的真实节点（`node_validate` 丢弃编造 `recipe_id`）
+- [X] **W2.1 `LLMClient` 实现**：`infra/llm_client.py`（OpenAI 兼容 + 指数退避 + 代码块围栏容错，26 项单测）
+- [X] **W2.2 最小 LangGraph 闭环**：`backend/agents/`（`state.py` / `nodes.py` 453 行 / `graph.py`）
+- [X] **W2.3 接口**：`POST /recommend`、`POST /recipes/search`（薄路由 + `RecommendService` 编排）
+- [X] **W2.4 降级与无解**：LLM 解析失败 → 规则降级；硬约束无候选 → 显式 `no_solution_reason`（真机复现 2.3 s 短路返回）
+- [X] **W3.1 前端推荐页**：`/recommend`（表单 + 结果 + 无解 + 降级态，`pnpm build` 5 条路由全过）
+- [X] **W3.2 口径诚实化**：README 全部改为"状态 + 证据"，删除未测量的「Recall@5 ≥ 85%」目标值
+- [X] **W3.3 工程门禁**：`.github/workflows/ci.yml`（ruff + pytest 覆盖率 ≥ 70% + 前端三检查），7 条命令本地实跑
+- [X] **W3.4 面试材料**：`docs/INTERVIEW.md`（简历三版本 + 自我介绍三时长 + 分主题深挖 Q&A + 承认答不上来的对照表）
+- [X] **W3.5 数据质量收尾（本次追加）**：解析层噪声清理（章节标题 / 说明句 / 缩放规则 / 工具分流 / 并列写法拆分），归一化率 73.5% → 75.3%，待确认用量 86 → 25 条；重灌 + 重建双层索引（372 卡片 + 3,806 步骤）；重跑三组评估确认结论未变
+- [X] **W3.6 覆盖率补强（本次追加）**：补齐 `infra/db.py`（64% → **100%**，`create_async_engine` 惰性故无需真库）、`infra/observability.py`（75% → **94%**，注入假 langfuse 模块覆盖启用路径）、`api/deps.py`（80% → **100%**，装配链 + 关闭失败分支）。**生产代码覆盖率 93% → 96%**，测试 456 → **491 passed / 4 skipped**。过程中踩到并修掉「用例间 `os.environ` 污染导致单跑绿、全量 6 红」，登记在 `docs/mistakes.md`
+
+**明确不做（三周内）**：注册登录、购物清单、一周菜单、烹饪指导模式、语音、长期记忆、多智能体、A/B 实验、付费。
+
+> 这些不是"失败"，是**主动推迟**。状态登记见 `docs/failed-features.md`。
 
 ---
 
@@ -28,7 +66,7 @@
 | D8  | 画像归属       | **`backend/domain/profiles/`**（domain 是唯一无 IO 层）                                                   | TECH_STACK §2.2                     |
 | D9  | 前端目录       | **不用 `src/`**：`app/`、`components/ui/`、`lib/`                                                   | CONVENTIONS §1.2 / §3.3            |
 | D10 | 文档命名与路径 | 规范名迁到`docs/`，README 在根目录                                                                              | README 文档索引                      |
-| D11 | 接口位置       | 所有 Protocol 集中**`domain/ports.py`**，实现在 `infra/`、`rag/`                                      | ARCHITECTURE §5                     |
+| D11 | 接口位置       | 所有 Protocol 集中**`domain/ports.py`**，实现在 `infra/`、`rag/`                                            | ARCHITECTURE §5                     |
 | D12 | 工期           | **总计 4-6 周**：M1 1-1.5 / M2 1.5-2 / M3 1-1.5 / M4 0.5-1 周                                               | README 路线图 / PRD §9              |
 | D13 | 可观测优先级   | Langfuse + Sentry 属**MVP**，未配置 key 时**自动降级为本地日志**                                      | CONVENTIONS §8.2 / TECH_STACK §2.6 |
 
@@ -43,16 +81,19 @@
 
 ## 2. 开工前准备（你要亲自做/申请的东西）
 
-- [ ] **P1 申请 LLM API Key**：DeepSeek（或任何 OpenAI 兼容），确定 `LLM_BASE_URL` / `LLM_MODEL`（`README.md` 环境变量表）
-- [ ] **P2 确定 Langfuse 形态**：自托管（docker）还是 Cloud，拿到 public/secret key（未配置也能开发，只是降级为本地日志）
-- [ ] **P3 确认机器资源**：bge-reranker-v2-m3 内存需求 ≥ 8GB；有 GPU 更好
-- [ ] **P4 解决模型下载**：BGE-M3 + reranker 走 ModelScope 镜像或 Ollama（TECH_STACK §6 避坑）
+- [X] **P1 申请 LLM API Key**：DeepSeek（或任何 OpenAI 兼容），确定 `LLM_BASE_URL` / `LLM_MODEL`（`README.md` 环境变量表）
+- [X] **P2 确定 Langfuse 形态**：自托管（docker）还是 Cloud，拿到 public/secret key（未配置也能开发，只是降级为本地日志）
+- [X] **P3 确认机器资源**：bge-reranker-v2-m3 内存需求 ≥ 8GB；有 GPU 更好
+- [X] **P4 解决模型下载**：BGE-M3 + reranker 走 ModelScope 镜像或 Ollama（TECH_STACK §6 避坑）
 - [X] **P5 菜谱数据**：HowToCook 已在本地（373 道菜，Markdown），License = **Unlicense（公有领域）**；按 D16 只取预估热量，不做营养推断
 - [ ] **P6 部署账号**：Vercel（前端）+ 云服务器（后端）+ 域名/HTTPS（PRD F-H5、§7）
 
 ---
 
 ## 3. 阶段 P0：仓库与工程基线（0.5-1 周，全部 [MVP]）
+
+> ⚠️ 以下 §3-§7 是**原 4-6 周全量计划的历史清单**，保留用于追溯任务编号与决策。
+> **当前执行口径以 §0.5 为准**；本清单里 `[ ]` 的项目绝大多数属于「主动推迟」，不代表失败。
 
 - [X] ~~**T0.1 建目录骨架**~~（部分完成：`docs/` 已建，`backend/` `frontend/` `data/` 待建）
 - [X] **T0.2 文档落地并改名**：已完成 —— `docs/{PRD,TECH_STACK,ARCHITECTURE,CONVENTIONS,UI_STYLE}.md` + 根 `README.md`
@@ -79,11 +120,11 @@
 ### 4.1 数据层
 
 - [X] **T1.1 建核心表**：12 张业务表已定义在 `backend/infra/tables.py` 并由 Alembic 落库（users / user_profiles / recipes / recipe_steps / ingredients / ingredient_aliases / recipe_ingredients / recipe_embeddings / conversations / messages / feedbacks / shopping_lists）
-- [X] **T1.1b 数据入库脚本**：`scripts/seed_recipes.py`，**已对真实库跑通且幂等**（连跑两次数字一致）：recipes 372 / recipe_ingredients 3902 / recipe_steps 3806 / ingredients 115 / ingredient_aliases 294。未归一化的关联行 1035（`ingredient_id IS NULL`，原文留在 `name_raw`）
+- [X] **T1.1b 数据入库脚本**：`scripts/seed_recipes.py`，**已对真实库跑通且幂等**（连跑两次数字一致）。**2026-10-11 解析层噪声清理后重灌的当前数字**：recipes 372 / recipe_ingredients **3697** / recipe_steps 3806 / ingredients 115 / ingredient_aliases 294（清理前为 3902 / 3806 / 115 / 294）
 - [X] **T0.9 实机验证**：Docker 起来后 `alembic upgrade head` 真跑通（PostgreSQL 16.15 + pgvector 0.8.7，13 表 / 33 索引）；另补迁移 `0002` 放宽两个原文字段
 - [X] **T1.2 HowToCook → JSON 入库脚本**：`scripts/import_howtocook.py`，372/372 解析成功、34→38 个单测全绿。三种用量语法（`名称 400 g` / `名称 = 2 斤` / `名称 15g*份数`）已覆盖；86 条上游没给数字的用量按「不编造」留原文
 - [X] **T1.2b 菜谱模型加 images 字段**：`Recipe.images`（数据集内相对路径，346 张，0 缺失）+ `Recipe.external_images`（2 条外链）；含括号文件名（`石凉粉(冰粉)成品1.jpg`）已正确处理
-- [X] **T1.3 食材归一化**：`data/ingredients/aliases.yaml`（112 个标准食材 / 别名）+ `domain/ingredients.py`（纯逻辑）+ `infra/ingredient_dict.py`（加载）。`Ingredient` 落 `canonical` / `category`；**命中率 73.5%**（2867/3902 条），未收录 856 种已按频次进 `import_report.json` 的 `unmapped_top`
+- [X] **T1.3 食材归一化**：`data/ingredients/aliases.yaml`（115 个标准食材 / 294 个别名）+ `domain/ingredients.py`（纯逻辑）+ `infra/ingredient_dict.py`（加载）。`Ingredient` 落 `canonical` / `category`。**2026-10-11 解析层噪声清理后**：命中率 **75.3%**（2784/3697 条），未收录 **748** 种进 `import_report.json` 的 `unmapped_top`（清理前为 73.5%、2867/3902、856 种）。**词表未新增任何词**——提升全部来自「不再把说明文字当食材」
 - [ ] **T1.3b 词表扩充** `[P1]`：按 `unmapped_top` 频次继续补（当前头部是冷门香料与地方食材，长尾收益递减）
 - [X] **T1.4 热量字段处理** `[MVP]`：缺失即标注「未知」，**不可编造**；不做蛋白质 / GI / 钠推断
 - [X] **T1.5 索引** `[MVP]`：HNSW(`m=16, ef_construction=64`) + `gin(tsv)` + `recipes(time_minutes)` + `gin(tags)`

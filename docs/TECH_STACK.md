@@ -1,35 +1,39 @@
 
-# MealCompass 技术栈清单（v1.1）
+# MealCompass 技术栈清单（v1.2）
 
 > **用途**：喂给 AI Coding 工具（Cursor / Copilot / Claude 等），作为项目开发的技术边界约束。
 > **选型原则**：成熟优先、社区资料丰富、AI 训练数据覆盖度高、本科生可在 4-6 周内独立完成。
 > **阅读说明**：✅ 表示 AI 训练数据覆盖充分；⚠️ 表示资料中等，需注意版本兼容。
+> **变更 v1.2（2026-10-11）**：总览表新增**「实装状态」列**。原因是 v1.0/v1.1 把**规划中**的依赖和**已在用**的依赖混在一张表里，读者会以为 RAGAS / Sentry / shadcn/ui 都在跑。三周聚焦后口径收敛为：**只有代码里真的 import 了、且真机跑通过的才算「在用」**，其余标注状态并指向 [`failed-features.md`](./failed-features.md)。
 > **变更 v1.1（2026-10-06）**：统一跨文档冲突（分层目录、接口位置、前端目录、可观测降级），全局口径见 [`../README.md`](../README.md) 的「全局约定（唯一口径）」。
 
 ## 一、技术栈总览
 
-| 层级                 | 技术选型                   | 版本锚定                | 关键理由                                        |
-| -------------------- | -------------------------- | ----------------------- | ----------------------------------------------- |
-| **AI 编排**    | LangGraph                  | ≥ 0.2                  | 状态机可控，LangChain 生产版                    |
-| **RAG 工具链** | LangChain                  | 0.3.x                   | RAG 生态最成熟，文档加载/分块/检索全套          |
-| **后端框架**   | FastAPI                    | 0.115+                  | 异步高性能，自动 Swagger，AI 应用首选           |
-| **数据校验**   | Pydantic                   | v2                      | FastAPI 原生集成，类型安全                      |
-| **向量数据库** | PostgreSQL + pgvector      | PG 16+ / pgvector 0.7+  | 一份数据库搞定关系+向量+全文检索，零额外运维    |
-| **全文检索**   | PostgreSQL tsvector        | 同 PG                   | 与 pgvector 同库，无需额外部署 Elasticsearch    |
-| **Embedding**  | BGE-M3                     | BAAI/bge-m3             | 中文效果好，支持稠密+稀疏，1024 维              |
-| **重排**       | bge-reranker-v2-m3         | BAAI/bge-reranker-v2-m3 | 轻量，多语言，推理快                            |
-| **LLM**        | DeepSeek / OpenAI 兼容 API | —                      | 通过 OpenAI 兼容接口，可无缝切换                |
-| **关键词检索** | rank-bm25 + jieba          | —                      | 轻量，无需独立服务，适合中小规模                |
-| **前端框架**   | Next.js                    | 14+                     | React 全栈框架，生态最大，AI 训练数据覆盖极充分 |
-| **前端语言**   | TypeScript                 | 5.x                     | 类型安全，AI 生成代码质量更高                   |
-| **CSS**        | Tailwind CSS               | v4                      | 实用类优先，AI 生成效率高                       |
-| **UI 组件**    | shadcn/ui                  | latest                  | 代码直接复制到项目，零抽象层，AI 可直接读写     |
-| **服务端状态** | TanStack Query             | v5                      | 缓存/重取/错误处理标准化                        |
-| **客户端状态** | Zustand                    | v5                      | 轻量，学习成本低                                |
-| **可观测**             | Langfuse Cloud + Sentry    | langfuse-python ≥ 4.17.0 | LLM 链路追踪 + 评估一体化；读取走 Observations API v2          |
-| **评估框架**   | RAGAS                      | latest                  | 专为 RAG 设计，四大指标开箱即用                 |
-| **容器化**     | Docker + Docker Compose    | —                      | 一键起全栈                                      |
-| **缓存**       | Redis                      | 7.x                     | 会话、限流、热点缓存                            |
+**实装状态口径**：`✅ 在用`（代码里真的调了、真机跑过） ｜ `🚧 已装未接线`（依赖在环境里但代码没用） ｜ `📋 仅规划`（没装、也没用）
+
+| 层级                 | 技术选型                   | 版本锚定                | 实装状态 | 关键理由                                        |
+| -------------------- | -------------------------- | ----------------------- | -------- | ----------------------------------------------- |
+| **AI 编排**    | LangGraph                  | ≥ 0.2（实装 1.2.14）   | ✅ 在用 | 状态机可控，LangChain 生产版                    |
+| **RAG 工具链** | LangChain                  | 0.3.x（实装 `langchain-core`） | ✅ 在用 | RAG 生态最成熟，文档加载/分块/检索全套          |
+| **后端框架**   | FastAPI                    | 0.115+                  | ✅ 在用 | 异步高性能，自动 Swagger，AI 应用首选           |
+| **数据校验**   | Pydantic                   | v2                      | ✅ 在用 | FastAPI 原生集成，类型安全                      |
+| **向量数据库** | PostgreSQL + pgvector      | PG 16+ / pgvector 0.8   | ✅ 在用 | 一份数据库搞定关系+向量+全文检索，零额外运维    |
+| **全文检索**   | PostgreSQL tsvector        | 同 PG                   | ✅ 在用（**辅助**；主通道是内存 BM25） | 与 pgvector 同库，无需额外部署 Elasticsearch    |
+| **Embedding**  | BGE-M3                     | `BAAI/bge-m3`（SiliconFlow 远端） | ✅ 在用（真机 `degraded_calls=0`） | 中文效果好，支持稠密+稀疏，1024 维              |
+| **重排**       | bge-reranker-v2-m3         | `BAAI/bge-reranker-v2-m3` | ✅ 在用 | 轻量，多语言，推理快                            |
+| **LLM**        | DeepSeek / OpenAI 兼容 API | `deepseek-ai/DeepSeek-V3` | ✅ 在用 | 通过 OpenAI 兼容接口，可无缝切换                |
+| **关键词检索** | rank-bm25 + jieba          | —                      | ✅ 在用 | 轻量，无需独立服务，适合中小规模                |
+| **前端框架**   | Next.js                    | 14+                     | ✅ 在用 | React 全栈框架，生态最大，AI 训练数据覆盖极充分 |
+| **前端语言**   | TypeScript                 | 5.x                     | ✅ 在用 | 类型安全，AI 生成代码质量更高                   |
+| **CSS**        | Tailwind CSS               | v4                      | ✅ 在用 | 实用类优先，AI 生成效率高                       |
+| **UI 组件**    | shadcn/ui                  | latest                  | 📋 **仅规划** | `components/ui/` 为空，当前全部手写 Tailwind → [F7](./failed-features.md) |
+| **服务端状态** | TanStack Query             | v5                      | ✅ 在用 | 缓存/重取/错误处理标准化                        |
+| **客户端状态** | Zustand                    | v5                      | ✅ 在用 | 轻量，学习成本低                                |
+| **可观测**     | Langfuse Cloud             | `langfuse-python` ≥ 4.17.0 | ✅ 在用（真机 trace 已确认 GENERATION + usage） | LLM 链路追踪；读取走 Observations API v2        |
+| **错误监控**   | Sentry                     | —                       | 📋 **仅规划** | 无任何 SDK 调用，异常只进本地日志 → [F18](./failed-features.md) |
+| **评估框架**   | RAGAS                      | latest                  | 📋 **仅规划** | 只评了检索侧，RAGAS 四项没跑 → [F11](./failed-features.md) |
+| **容器化**     | Docker + Docker Compose    | —                      | ✅ 在用（PG 必要；Redis 见下行） | 一键起全栈                                      |
+| **缓存**       | Redis                      | 7.x                     | 🚧 **已装未接线** | 容器 healthy，但代码 0 引用 → [F17](./failed-features.md) |
 
 ## 二、分层详解
 
@@ -39,22 +43,32 @@
 
 选择理由：LangGraph 是 LangChain 的“生产版”，提供显式状态管理和 checkpointing，适合复杂可控的工作流。LangChain 负责文档加载、分块、检索等 RAG 链路，两者配合使用。LlamaIndex 虽然 RAG 能力强，但本项目重点在 Agent 编排（多约束、工具调用、反思校验），LangGraph 更匹配。
 
-**LangGraph 结构约束**：
+**LangGraph 结构约束**（**⚠️ v1.2 修订：下面是原规划的 7 节点全量图，实际交付的是 4 节点最小闭环，两者必须分清**）：
 
 ```
+【原规划（未实现）】
 State: 消息历史 / 用户画像 / 约束条件 / 候选菜谱 / 选中菜谱 / 当前步骤
 Nodes: parse → clarify → search → filter → rank → reflect → output
 Edges: 条件路由（信息不足→澄清，检索为空→放宽约束，校验失败→重试）
+
+【实际交付（在跑）】
+Nodes: parse → search →（无候选则 no_solution 短路）→ generate → validate
+State: 扁平 TypedDict，无消息历史、无 checkpointer（未挂 PostgresSaver，也无 MemorySaver）
+Edges: search 后条件分支；其余为线性
 ```
 
-**RAG 管线约束**：
+**为什么砍到 4 节点**：三周聚焦里，**一条能讲透、有降级、可测量的链路**比七个节点更能说明问题。`clarify` / `filter` / `rank` / `reflect` 的职责被下推了——硬约束直接进 SQL（`rag/retriever.py`），引用校验做成 `validate` 节点，所以它们不是"没做"，而是**没有以独立节点的形式存在**。多轮对话与会话持久化是主动推迟（[F9](./failed-features.md)）。
+
+**RAG 管线约束**（与实测一致）：
 
 ```
-菜谱卡片层（粗召回） → 向量检索(pgvector) + BM25(rank-bm25)
-                    → RRF 融合 → bge-reranker 重排 → Top 10
-菜谱步骤层（精取详情） → 按 recipe_id 取步骤块
+菜谱卡片层（粗召回） → 向量检索(pgvector, 1024维 HNSW) + BM25(rank-bm25 + jieba)
+                    → RRF 融合(k=60, 等权) → bge-reranker-v2-m3 重排 → Top 10
+菜谱步骤层（精取详情） → 按 recipe_id 取步骤块（3,806 条步骤向量）
 生成层              → 硬约束规则引擎校验 + LLM 生成 + 引用强制
 ```
+
+> **实测提示（v1.2 补充）**：这条管线**已完整跑通**，但消融显示 **RRF 那一步是净负贡献**（`hybrid` R@5 61.25% < 纯向量 63.75%；重排把 R@10 从 68.75% 拉到 77.50%，增益全部来自重排）。原因与权重建议见 `README.md`「结论二/结论三」——**不要把"管线更长"当成"效果更好"**。
 
 **关键约束**：
 
@@ -166,7 +180,7 @@ backend/
 
 ### 2.5 前端层
 
-**Next.js 14 + TypeScript + Tailwind + shadcn/ui + TanStack Query** ✅
+**Next.js 14 + TypeScript + Tailwind + + TanStack Query + Zustand** ✅（**shadcn/ui 未初始化**，见下）
 
 选择理由：Next.js 是 React 生态最成熟的全栈框架，AI 训练数据覆盖最充分，生成代码质量最高。React 在 LLM 训练数据集中占主导地位，AI 生成 UI 代码时几乎首选 React。
 
@@ -174,7 +188,7 @@ backend/
 
 - 使用 App Router（非 Pages Router）
 - 服务端状态用 TanStack Query，客户端状态用 Zustand
-- UI 组件从 shadcn/ui 复制到项目，不引入组件库依赖
+- ⚠️ **UI 组件从 shadcn/ui 复制到项目** —— **这一条当前是「规划」，不是现状**：`components/ui/` 是空目录，skeleton 均为手写 Tailwind。三周聚焦把它排到了外围（[F7](./failed-features.md)）。
 - 响应式设计，移动端可用
 - 目录不带 `src/` 前缀：`app/`、`components/ui/`、`lib/`
 - Tailwind v4 用 CSS-first：token 定义在 `app/globals.css` 的 `@theme`，不生成 `tailwind.config.js`
@@ -183,18 +197,26 @@ backend/
 
 ### 2.6 评估与可观测层
 
-**Langfuse + RAGAS** ✅
+**Langfuse ✅ 在用 ｜ RAGAS 📋 仅规划**
 
-Langfuse 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token），RAGAS 用于自动化评估（Faithfulness / Answer Relevancy / Context Precision / Context Recall）。两者配合使用，Langfuse 做可观测，RAGAS 做量化评估。未配置 Langfuse key 时自动降级为本地结构化日志，不阻塞本地开发。 本项目实现：`infra/observability.py` 统一封装（SDK v4.17.0），key 缺失时降级为 no-op；读取 trace 一律用 Observations API v2。
+**Langfuse（已实装）** 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token）。本项目实现：`infra/observability.py` 统一封装（SDK v4.17.0），key 缺失时降级为 no-op，不阻塞本地开发；读取 trace 一律用 Observations API v2。真机已确认 `parse-intent` 与 `generate-recommendations` 记为 GENERATION 并带 `model` + `usage_details`。
 
-**评估指标约束**：
+**RAGAS（未实装）** 本文件 v1.1 写的"RAGAS 用于自动化评估（Faithfulness / Answer Relevancy / Context Precision / Context Recall）"**目前没有一行代码**。实际情况是：**只做了检索侧评估**，用自写的 `backend/scripts/eval.py` 算 Recall@5 / Recall@10 / MRR@10 / nDCG@5，共 40 条人工核验查询。
 
-| 维度  | 指标                    | 目标值            |
-| ----- | ----------------------- | ----------------- |
-| 检索  | Recall@5 / nDCG@5       | ≥ 85% / ≥ 0.8   |
-| 生成  | 引用准确率 / 约束满足率 | ≥ 95% / 100%     |
-| Agent | 任务成功率 / 工具准确率 | ≥ 90% / ≥ 95%   |
-| 性能  | P95 延迟 / Token 成本   | ≤ 3s / ≤ ¥0.05 |
+**为什么没上 RAGAS**：① 生成侧评估需要 LLM 当裁判，Token 成本高且判分本身有抖动，40 条样本下结论不稳；② 三周聚焦里"把检索侧消融做扎实"优先级更高（也确实产出了 RRF 结构性缺陷这条负结论）；③ 装 RAGAS 会引入清单外依赖。登记为 [F11](./failed-features.md)，属**主动推迟**而非失败。
+
+**评估指标约束**（**v1.2 修订：原表全是「目标值」，与本项目实测值差距很大，现已改为「目标值 / 实测值」并列**）：
+
+| 维度  | 指标                    | 目标值            | **实测值（2026-10-11）** |
+| ----- | ----------------------- | ----------------- | ----------------------- |
+| 检索  | Recall@5 / nDCG@5       | ≥ 85% / ≥ 0.8   | **63.75% / 0.6309**（纯向量，40 条评估集）——**未达标，差距归因见 README** |
+| 生成  | 引用准确率 / 约束满足率 | ≥ 95% / 100%     | **引用准确率 100%**（`domain/citations.py` 硬校验，编造 `recipe_id` 必被丢弃 + 单测）；**约束满足率未单独测量** |
+| Agent | 任务成功率 / 工具准确率 | ≥ 90% / ≥ 95%   | **未测量**（无工具调用节点，本闭环不做 tool calling） |
+| 性能  | P95 延迟 / Token 成本   | ≤ 3s / ≤ ¥0.05 | **检索 P95 859 ms（达标）；`/recommend` 端到端 9–12 s（未达标，`parse`+`generate` 串行）**；Token 成本未计 |
+
+> ⚠️ **原 v1.1 表把「目标值」写成了一列孤立数字，读起来像是已经达成。** 这是文档最容易误导人的地方，也是本次修订的起因。**「85%」这个目标值已被删除出 README 的结论口径**，这里保留只是为了标注差距。
+> 生成侧四项（RAGAS）未做 → [F11](./failed-features.md)；端到端延迟欠账 → [F14](./failed-features.md)。
+
 
 ## 三、开发工具链
 
@@ -202,8 +224,8 @@ Langfuse 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token），R
 | ------------------------ | ------------------ | ----------------------------------- |
 | **uv**             | Python 包管理      | 比 pip 快 10-100x，AI 生成友好      |
 | **Ruff**           | Linter + Formatter | 替代 flake8 + black + isort         |
-| **pytest**         | 测试               | 单元测试覆盖率 ≥ 70%               |
-| **Docker Compose** | 本地全栈启动       | 一条命令起 PG + Redis + 后端 + 前端 |
+| **pytest**         | 测试               | **实测 491 passed / 4 skipped，生产代码覆盖率 96%**（门禁 ≥ 70%） |
+| **Docker Compose** | 本地全栈启动       | 一条命令起 PG + Redis + 后端 + 前端（**Redis 当前只起容器，代码未用**） |
 | **Langfuse**       | LLM 可观测         | 自托管或 Cloud                      |
 | **GitHub Actions** | CI                 | Lint + Test + Build                 |
 
@@ -215,10 +237,10 @@ Langfuse 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token），R
 # 技术栈约束
 - Python: 3.11+, FastAPI 0.115+, Pydantic v2
 - Agent: LangGraph >= 0.2, LangChain 0.3.x
-- 数据库: PostgreSQL 16 + pgvector 0.7
+- 数据库: PostgreSQL 16 + pgvector 0.8
 - Embedding: BGE-M3 (BAAI/bge-m3), 1024维
 - 重排: bge-reranker-v2-m3
-- 前端: Next.js 14 App Router + TypeScript + Tailwind v4 + shadcn/ui（目录不带 src/）
+- 前端: Next.js 14 App Router + TypeScript + Tailwind v4（目录不带 src/）；**shadcn/ui 未初始化**，勿引用其组件
 - 状态: TanStack Query (服务端) + Zustand (客户端)
 - LLM: OpenAI 兼容接口，通过 LLMClient 抽象层调用
 
@@ -238,32 +260,34 @@ Langfuse 用于 LLM 链路追踪（每一步的输入/输出/延迟/Token），R
 
 ## 五、资料索引
 
-| 技术         | 官方文档                               | AI 训练数据覆盖 |
-| ------------ | -------------------------------------- | --------------- |
-| LangGraph    | langchain-ai.github.io/langgraph       | ✅ 充分         |
-| LangChain    | python.langchain.com                   | ✅ 充分         |
-| FastAPI      | fastapi.tiangolo.com                   | ✅ 充分         |
-| Pydantic v2  | docs.pydantic.dev                      | ✅ 充分         |
-| pgvector     | github.com/pgvector/pgvector           | ✅ 充分         |
-| Next.js      | nextjs.org/docs                        | ✅ 极充分       |
-| Tailwind CSS | tailwindcss.com/docs                   | ✅ 极充分       |
-| shadcn/ui    | ui.shadcn.com                          | ✅ 充分         |
-| BGE-M3       | huggingface.co/BAAI/bge-m3             | ⚠️ 中等       |
-| bge-reranker | huggingface.co/BAAI/bge-reranker-v2-m3 | ⚠️ 中等       |
-| Langfuse     | langfuse.com/docs                      | ⚠️ 中等       |
-| RAGAS        | docs.ragas.io                          | ⚠️ 中等       |
+| 技术         | 官方文档                               | AI 训练数据覆盖 | 本项目 |
+| ------------ | -------------------------------------- | --------------- | ------ |
+| LangGraph    | langchain-ai.github.io/langgraph       | ✅ 充分         | ✅ 在用（1.2.14） |
+| LangChain    | python.langchain.com                   | ✅ 充分         | ✅ 在用（`langchain-core`） |
+| FastAPI      | fastapi.tiangolo.com                   | ✅ 充分         | ✅ 在用 |
+| Pydantic v2  | docs.pydantic.dev                      | ✅ 充分         | ✅ 在用 |
+| pgvector     | github.com/pgvector/pgvector           | ✅ 充分         | ✅ 在用（0.8） |
+| Next.js      | nextjs.org/docs                        | ✅ 极充分       | ✅ 在用（App Router） |
+| Tailwind CSS | tailwindcss.com/docs                   | ✅ 极充分       | ✅ 在用（v4 CSS-first） |
+| shadcn/ui    | ui.shadcn.com                          | ✅ 充分         | 📋 **未采用**（手写组件，[F7](./failed-features.md)） |
+| BGE-M3       | huggingface.co/BAAI/bge-m3             | ⚠️ 中等       | ✅ 在用（SiliconFlow 远端） |
+| bge-reranker | huggingface.co/BAAI/bge-reranker-v2-m3 | ⚠️ 中等       | ✅ 在用 |
+| Langfuse     | langfuse.com/docs                      | ⚠️ 中等       | ✅ 在用（真机 trace 已验证） |
+| RAGAS        | docs.ragas.io                          | ⚠️ 中等       | 📋 **未采用**（[F11](./failed-features.md)） |
 
 ## 六、避坑指南
 
 | 坑                           | 说明                            | 应对                                             |
 | ---------------------------- | ------------------------------- | ------------------------------------------------ |
 | **LangGraph API 变动** | 版本迭代快，AI 可能混用新旧 API | 锁定版本，参考官方 latest 文档                   |
-| **BGE 模型下载**       | HuggingFace 国内访问慢          | 用 ModelScope 镜像或 Ollama 拉取                 |
+| **BGE 模型下载**       | HuggingFace 国内访问慢          | 用 ModelScope 镜像或 Ollama 拉取；本项目走 SiliconFlow 远端 API，**不下载本地模型**（`sentence-transformers` 未安装，本地兜底未验证） |
 | **pgvector 索引**      | 默认无索引，数据量大后慢        | 建 HNSW 索引（`CREATE INDEX USING hnsw`）      |
 | **Next.js App Router** | 与 Pages Router 概念差异大      | 明确使用 App Router，不用`getServerSideProps`  |
-| **shadcn/ui 版本**     | CLI 和组件版本可能不一致        | 用`npx shadcn@latest` 统一版本                 |
-| **RAGAS 评估成本**     | 每次评估调用 LLM，Token 消耗大  | 用小模型（如 GPT-4o-mini）做评估，控制评估集规模 |
-| **BM25 中文分词**      | jieba 分词效果影响检索质量      | 建食材同义词表，查询时扩展                       |
+| **shadcn/ui 版本**     | CLI 和组件版本可能不一致        | ⚠️ **本项目未采用 shadcn/ui**（`components/ui/` 为空，全部手写 Tailwind）。若后续引入，用 `npx shadcn@latest` 统一版本，并把主题映射到 `docs/UI_STYLE.md` 的 Natural Organic 调色板 |
+| **RAGAS 评估成本**     | 每次评估调用 LLM，Token 消耗大  | ⚠️ **本项目未采用 RAGAS**（只做了检索侧评估）。若后续引入：用小模型做裁判、控制评估集规模；注意裁判判分本身有抖动，小样本下的差异不能当结论 |
+| **BM25 中文分词**      | jieba 分词效果影响检索质量      | **tsv 与 BM25 必须共用 `rag/tokenization.py` 的同一分词**（改分词 = 全量重建 tsv 与 BM25 语料）；另注意 BM25 语料是内存实现，**不能继承向量通道的 Top50 边界**，否则丧失独立召回价值 |
+| **RRF 融合的隐性陷阱** | 等权 RRF 下 `1/(k+1) < 2/(k+池大小)`，双通道候选**必然**压过所有单通道候选 | 别只看"两路都召回了"就觉得更稳；**必须做消融**（本项目实测混合检索 R@5 61.25% < 纯向量 63.75%，详见 `README.md` 结论二） |
+| **重灌后忘重建索引**   | 卡片文本变了但向量没重算，指标"看起来没变"却完全不可信 | 走 `docs/CONVENTIONS.md` §4.6 的六步证据链：留底 → 重灌 → **重建索引** → 校验标注 → 全量重跑 → 一次性统一文档 |
 
 ## 七、不选用的技术及原因
 

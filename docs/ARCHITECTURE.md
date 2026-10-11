@@ -396,12 +396,15 @@ class Retriever(Protocol):
 class Rule(Protocol):
     def evaluate(self, recipe: Recipe, profile: UserProfile) -> RuleResult: ...
 
-# agents/graph.py
-async def run_agent(
-    user_input: str,
-    profile: UserProfile,
-    conversation_id: str,
-) -> AgentOutput: ...
+# agents/graph.py（**已落地，见 v1.6**）
+@dataclass
+class AgentDeps:
+    retriever: Retriever
+    llm: LLMClient
+    settings: Settings
+
+def build_graph(deps: AgentDeps, *, checkpointer: Any = None) -> Any: ...
+async def run_agent(query: str, filters: HardFilters | None, *, deps: AgentDeps, top_k: int = 3) -> RecommendResponse: ...
 
 # domain/ports.py（实现：infra/llm_client.py）
 class LLMClient(Protocol):
@@ -447,6 +450,11 @@ class RerankClient(Protocol):
 | v1.2 | 2026-10-07 | T1.9 落地：`rag/reranker.py` 重排编排（失败降级回 RRF 顺序并标记 degraded）；`HybridRetriever` 可选 `reranker` 参数；`smoke_retrieval --rerank` 真远程验证 | F-B4 重排落点；重排绝不能拖垮检索，降级是契约 |
 | v1.4 | 2026-10-07 | T1.14-T1.16 收尾：FastAPI lifespan 校验 prod secret，`APP_VERSION` 统一 `/version` 与 OpenAPI；request-id middleware 与 JSON 日志保留安全扩展字段、服务端 traceback | 配置/异常/日志契约需可验证，敏感信息不得进入响应或日志 |
 | v1.5 | 2026-10-09 | T1.17/T1.18 落地 `frontend/`：App Router 骨架 + `(auth)`/`(main)` 路由组（layout 保持 Server Component，Providers 是唯一客户端边界）；Natural Organic token 进 `app/globals.css` 的 `@theme`；数据层 `lib/api.ts`（类型守卫 + `ApiError`）+ `lib/hooks/`（TanStack Query）+ `lib/stores/`（Zustand）+ `status-panel`（加载/错误/重试） | 前后端骨架是 M1 验收落点；服务端状态与客户端状态必须分离，HTTP 错误必须归一化 |
+| **v1.6** | **2026-10-11** | **W1-W3 三周聚焦：新增 `domain/models/recommend.py`（`RecommendRequest`/`SearchRequest`/`SearchResponse`/`RecommendResponse` 四个对外契约模型）+ `infra/llm_client.py`（`RemoteLLM` / `strip_code_fence` / `build_llm_client`，OpenAI 兼容 + 指数退避）+ `agents/`（`state.py` 状态与常量、`jsonx.py` 脏 JSON 稳健解析、`nodes.py` 五节点、`graph.py` 组装与 `AgentDeps`）+ `services/recommend_service.py`（`RecommendService`）+ `api/v1/recommend.py`（`POST /recommend`、`POST /recipes/search`）+ `scripts/eval.py` + `data/eval/queries.yaml` + `.github/workflows/ci.yml`。**Agent 拓扑固定为 `START → parse → search ─┬─(有候选)→ generate → validate → END └─(无候选)→ no_solution → END`**；`domain/citations.py` 从死代码变为 `node_validate` 的核心校验 | **原计划 7 节点（澄清追问/反思重试/工具调用）+ 5 工具 + 11 页面在三周内做不完，且核心链路一行代码都没有**；改为「一条能讲透、能测量、有降级路径的完整链路」，把时间投到评估集与消融实验。评估结论已证明这个取舍的价值：**混合检索在 40 条评估集上未超过纯向量（RRF 负贡献），唯一正收益来自重排**——这类结论只有做了消融才会知道 |
+| v1.7 | 2026-10-11 | `CONVENTIONS` §4.5 观察名表修正：`PARSE_INTENT` 的类型由 `span` 改为 **`generation`**（补 `CLARIFY_REQUEST` / `EVAL_RETRIEVAL` / `EVAL_FAITHFULNESS` 三行）。**观察名（命名契约）不变，只改类型** | 「LLM 调用必须记为 generation 并带 model + usage_details」是硬规则，而 `parse-intent` 确实是一次 LLM 调用；两条规则冲突时以硬规则为准。真机 Langfuse 已确认带 `model` 与 `usage_details`，类型改对反而让成本/Token 视图变完整 |
+| v1.8 | 2026-10-11 | `/dashboard` 文案修正：删掉「页面刻意不展示推荐结果：推荐 Agent…尚未实现」这句已过期的描述，改为指向 `/recommend`，并把「未完成能力统一记录在 `docs/failed-features.md`」保留 | 推荐链路已上线（`/recommend`），旧文案与现状矛盾；文档与界面都不许假装未做的东西可用，也不许假装已做的东西不存在 |
+| v1.9 | 2026-10-11 | 解析层（`scripts/import_howtocook.py`）新增噪声过滤与并列拆分：`_is_section_heading` / `_looks_like_prose` 扩容（用量句、容量句、缩放规则）/ `TOOL_KEYWORDS` 扩 20 项 / 新导出 `parse_ingredient_lines`（`、` `/` `+` 拆分）。**卡片文档的食材输入随之变化**，因此重灌 `seed_recipes` 后**必须重跑 `scripts/build_index`**（本次重建 372 卡片 + 3,806 步骤向量） | 「必备原料和工具」区里混着章节小标题（`工具`/`原料:`）、说明句（`盐的用量为`）、缩放规则（`肉量 = 份数 * 200g`）与工具名，被当成食材后既污染 `unmapped_top` 又拉低归一化率；修在解析层而不是往词表塞垃圾。**代价是卡片文本变了 → embedding 变 → 检索指标变**，已按「留底 → 重灌 → 重建索引 → 校验 40/40 → 全量重跑」流程处理，三组消融结论未变 |
+| v1.10 | 2026-10-11 | 检索评估结论落地到文档：`README.md`「评估结果」四节 + 权重敏感性表全部换成重灌后的实测数字；`docs/INTERVIEW.md` 补 Q4.4b（降级标签精确契约）、Q4.4c（`node_parse` 数组边界）、Q7.4 重写（RRF 结构不等式 + 权重实验）、Q7.5（抖动与 P95 不可信）、Q7.6（63.75% 的差距归因） | 早期 README 写过「Recall@5 ≥ 85%」这个**无测量支撑**的目标值，且「BM25 噪声顶头部」的归因被逐条三元组分析否定；文档必须与实测一致，负面结论也要留档 |
 
 **迭代规则**：
 

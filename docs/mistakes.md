@@ -91,3 +91,42 @@
 - 原因：只读对比权限项发现，仓库根 `D:\Allcode\MealCompass` 上有两条显式授权（当前用户 FullControl、沙箱 SID `S-1-4-446388748-297474345` 的 Write/Delete），而 `.git` 上两条都没有、继承又被关闭，所以沙箱进程对 `.git` 没有写权限。**这是权限缺口，不是抢锁**。
 - 解决：用 `diagnose-windows-sandbox-acl` 技能的一次性脚本（非受限运行、Medium 完整性、未提权）在 `.git` 上补了当前用户 FullControl，`WRITE_OWNER` 由 `false` 验证为 `true`，改动有 JSON 备份与撤销脚本（`D:\Allcode\MealCompass\.tmp\acl-recovery\`）。**但受限进程仍被拒**——沙箱实际用的是工作区根上那条 `S-1-4-*` 授权，而该技能按设计不会自行添加这个 SID。最终改用「完全权限」执行提交与合并，两次 commit + 一次 `--no-ff` 合并全部成功。遗留：若要在受限模式下提交，需人类把会话切到完全权限，或让 DSH 为 `.git` 补上与工作区根一致的授权。
 
+## 2026-10-11 C1 共享契约：E501 / format 漂移，以及误用系统 python 跑 pytest
+- 问题：实现的 `ruff check .` 报 `E501 Line too long (121/122 > 120)`，全在 `domain/models/recommend.py` 的 `Field(..., description="…中文…")` 行；`ruff format --check .` 同时报 `test_llm_client.py` 里含 `\n` 的单引号字面量（`'  \n 红烧肉 \n\n'`）需要重排。
+- 原因：ruff 按字符数计宽，中文显示宽度是 2 但只算 1 个字符，所以「看着没超」的行实际已过 120；`ruff format` 会把含换行的单引号字符串统一改成双引号（格式规则与手写风格无关）。
+- 解决：没有手工凑行，直接对这两个文件跑 `ruff format <file>`，让 ruff 自己排版，再跑 `ruff check .`（exit 0）+ `ruff format --check .`（71 files already formatted，exit 0）。
+- 顺带踩坑：第一次验证时误用了系统 `python -m pytest`（本机 `python` 指向 anaconda 3.13），输出 `PytestConfigWarning: Unknown config option: asyncio_mode` 且 `1 error during collection`——`backend\.venv` 才是装了 pytest-asyncio 的解释器。改用 `.venv\Scripts\python.exe` 后 26 passed。`docs/CONVENTIONS.md` 与 `AGENTS.md` §5.1 都写了要用 `.venv`，属于自己没照做。
+
+## 2026-10-11 Lead 广播了过期状态，把「未完成的依赖」说成「已完成」
+- 问题：Lead 给 teammate `quality` 派发 `task-5` 时，消息里写「它的 blockers（task-2/task-3）已完成，可以开了」。实际 **`task-3`（eval）当时仍是 `in_progress`**——Lead 刚给它追加了「RRF 权重敏感性诊断」，还没收工。`quality` `claim` 时被看板拒绝（`not ready to claim`），并把这条不一致当成「Lead 说的与看板不符」反馈回来。
+- 原因：Lead 把「我看到某个 teammate 汇报过一版数字」等同于「该任务已 completed」，**没有以共享任务板的 `status` 为唯一事实源**。而且此时 eval 正在对同一个 Postgres 跑真实消融，若 quality 按 Lead 的错误信息开始重灌 DB，**会直接污染 eval 的实测数字**——错误的广播差一步就变成数据事故。
+- 解决：① 立即 `team_task_list` 核对看板真实状态，把 `task-5` 的 `blocked_by` 从 `["task-2","task-3"]` 改成 `["task-2"]` 让 `quality` 能开工；② 明确把「DB 重灌与全量覆盖率最终一遍」**排在 eval 收工之后**，并要求 `quality` 在重灌前先把 `data/eval/reports/*.json` 复制到 `.tmp/eval_reports_before/` 留底、重灌后**必须重跑 `build_index`**（卡片文本变了，不重建索引向量就和文本对不上）；③ 新增规矩：**派单/解锁/宣告依赖完成之前，一律先 `team_task_list` 看 `status`，不靠记忆和汇报推断**；涉及共享资源（数据库、索引、报告目录）的写操作，必须**等产出方 `completed` 后再做**，并遵守先留底、后覆盖。
+
+## 2026-10-11 C5 测试写完了、实现没写：工作树进 RED，owner 上下文耗尽
+- 问题：`quality` 按 TDD 先写测试——`backend/tests/unit/test_import_howtocook.py` 从 235 行扩到 **649 行**（新增 7 组参数化用例 + `NOISE_FIXTURE`），但**实现侧的 `parse_ingredient_lines` 一个字都没写**就耗尽了上下文。等他退出后工作树是红的：
+  ```
+  E ImportError: cannot import name 'parse_ingredient_lines' from 'scripts.import_howtocook'
+  !!! Interrupted: 1 error during collection !!!
+  1 error in 2.34s
+  ```
+  `ruff check .` 仍然 exit 0——**静态检查全绿掩盖了「测试根本收不上来」**，这是最容易被误判成"没问题"的状态。
+- 原因：① TDD 的「红」被当成了正常中间态，但**没有设定「红多久、谁来接手」的交接点**；② teammate 的上下文预算没有和交付物规模挂钩（649 行测试 + 实现 = 一个任务太重）；③ 依赖 `quality` 的验收标准是「pytest 全绿」，但测试作者与实现作者是同一个人的强耦合，他一旦退出就没人知道契约细节。
+- 解决：Lead 亲自按 task-6 接手实现（不再往下派）。做法是**把测试当规格读**——先跑一次拿到全部失败用例，再逐类补：`_is_section_heading` 精确匹配章节标题（`工具`/`原料:`）、`_looks_like_prose` 扩容（用量句/容量句/缩放规则，但用 `PROSE_NAME_MARKERS` 只判**名字**不判右侧表达式，避免误杀 `盐量 = 兔肉斤数 * 2 克`）、`TOOL_KEYWORDS` 补 20 个真实工具词、新增 `parse_ingredient_lines` 负责并列拆分。迭代 6 轮：12 failed → 9 → 6 → 3 → 1 → **152 passed**；再全量 **456 passed, 4 skipped**、`ruff check` / `format --check` exit 0。**新增规矩**：① TDD 任务必须在派单时就写清「测试文件与实现文件，若 owner 中断由谁接手」；② 测试文件行数超过 300 行就拆成两个任务（先契约、后实现）；③ **「绿」只认 `pytest` 的真实输出，`ruff` 全绿不构成任何交付证据**——`ruff` 不 import 模块，收不上来的测试它永远发现不了。
+
+## 2026-10-11 数据重灌后指标变了：`hybrid` 的 R@5 从 59.58% 变成 61.25%（没有回退，如实保留）
+- 问题：解析层清掉 205 条噪声食材后，卡片文档（菜名 + 简介 + **食材**）变了 → 372 条卡片 embedding 重算 → 检索排序变化。重跑三组消融，`hybrid` 的指标从 R@5 59.58% / R@10 67.92% / MRR 69.61% 变成 **61.25% / 68.75% / 70.86%**；`vector` 的 R@10 从 72.50% 变成 72.08%、MRR 从 76.25% 降到 74.00%。
+- 原因：**这不是 bug，是预期内的效应**——卡片文本变了，向量就变了。但有两个陷阱：① 若不重跑 `scripts/build_index`，向量和文本会对不上，指标会"看起来没变"却完全不可信；② 若拿新旧数字混着写 README，同一张表里会出现两组不同语料的数，**属于自相矛盾**。
+- 解决：① 重灌前把 4 份报告留底到 `.tmp/eval_reports_before/`；② 按 `import_howtocook → seed_recipes → build_index`（372 卡片 + 3,806 步骤）顺序重灌，再 `--validate-only` 确认 **40/40 标注菜名仍存在**（说明过滤没过头）；③ **全量重跑三组 + 6 档权重消融**，README 的表格、结论、分场景表、`docs/INTERVIEW.md`、`docs/DATA_SOURCES.md`、`TODO.md` **一次性全部换成新数字**，不留混用；④ 重算归因（7 条回归查询 / 21 个金标准：双通道 7、仅向量 13、仅 BM25 0、均未召回 1），**核心结论未变**（等权 RRF 的结构性缺陷、重排只赢 R@10）。**新增规矩**：**任何影响语料或索引的重灌，都必须「留底 → 重灌 → 重建索引 → 校验标注 → 全量重跑 → 一次性统一所有文档数字」，中间任何一步偷懒都会留下不可信的数字。**
+
+## 2026-10-11 C5 补覆盖率测试时踩到「用例间环境变量污染」：单跑全绿、全量 6 红
+- 问题：为把 `infra/db.py`(64%) / `infra/observability.py`(75%) / `api/deps.py`(80%) 的覆盖率补上去，新增了三个测试文件。**单独跑 `test_infra_observability.py` 时 15 passed、覆盖率 100%**；但跑全量时出现：
+  ```
+  FAILED tests/unit/test_api_deps.py::test_tracing_degraded_mirrors_settings
+  FAILED tests/unit/test_infra_observability.py::test_configure_returns_false_without_keys
+  FAILED tests/unit/test_infra_observability.py::test_configure_only_needs_one_key_missing_to_degrade
+  ... (共 6 个)
+  6 failed, 485 passed, 4 skipped
+  ```
+- 原因：`observability.configure()` 的**启用路径会往 `os.environ` 写 `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`**，而 `Settings(_env_file=None)` 里的 `_env_file=None` **只关掉 `.env` 文件，关不掉真实环境变量**。于是"启用路径"用例先跑之后，后面的"未配 key"用例**从环境变量里捡到了上一个用例留下的 key**，变成已配置状态。这是典型的**用例间顺序依赖**——单跑绿、全量红，比全红更危险。
+- 解决：① 给 `test_infra_observability.py` 加 autouse fixture，在每个用例前后**保存并还原 `LANGFUSE_*` 四个变量**，同时清掉模块级 `_client/_module/_ready/_degraded_reason`；② `enabled` fixture 也负责还原环境变量；③ 构造 `Settings` 时**显式传 `langfuse_public_key=None` / `langfuse_secret_key=None`**（初始化参数优先级最高，压过环境变量）；④ **正反两种文件顺序各跑一遍**确认无顺序依赖。结果：491 passed / 4 skipped，覆盖率 **93% → 96%**（`api/deps.py` 与 `infra/db.py` 到 100%）。**新增规矩**：**任何写 `os.environ` 的模块，其测试必须自带环境变量保存/还原；看见"单文件绿、全量红"先怀疑用例间污染，不要怀疑被测代码。**
+

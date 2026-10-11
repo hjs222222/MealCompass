@@ -300,13 +300,35 @@ async def search_recipes(query: str, filters: dict, top_k: int = 10) -> list[dic
 | 常量 | 观察名 | 类型 |
 | ---- | ------ | ---- |
 | `RECOMMEND_REQUEST` | `recommend-request` | span（根；一个推荐请求 = 一个 trace） |
-| `PARSE_INTENT` | `parse-intent` | span |
+| `PARSE_INTENT` | `parse-intent` | **generation**（见下方 ⚠️） |
+| `CLARIFY_REQUEST` | `clarify-request` | span（未接线） |
 | `RETRIEVE_RECIPES` | `retrieve-recipes` | retriever |
 | `RERANK_RECIPES` | `rerank-recipes` | span |
 | `FILTER_HARD_CONSTRAINTS` | `apply-hard-constraints` | span |
 | `GENERATE_RECOMMENDATIONS` | `generate-recommendations` | generation |
 | `REFLECT_VALIDATE` | `reflect-validate` | span |
+| `EVAL_RETRIEVAL` | `eval-retrieval` | span（离线评估） |
+| `EVAL_FAITHFULNESS` | `eval-faithfulness` | span（离线评估，未接线） |
 | `TOOL_*` | `tool-*` | tool |
+
+> ⚠️ **`PARSE_INTENT` 的类型是 `generation`，不是本表原来写的 `span`。**
+> 原因：本表第 312 行的硬规则「LLM 调用必须记为 `generation` 并带 `model` + `usage_details`」优先级更高，
+> 而 `parse-intent` **确实是一次 LLM 调用**（把自然语言翻译成硬约束）。两条规则冲突时以硬规则为准。
+> 真机已在 Langfuse 确认：`parse-intent` 为 GENERATION，带
+> `model=deepseek-ai/DeepSeek-V3` 与 `usage_details={input_tokens:177, output_tokens:37, total:214}`。
+>
+> 决策记录：**观察名（命名契约）不变，只改类型**。类型是给看板分组用的，改名才会破坏已保存的过滤器；
+> 类型改对反而让成本/Token 视图变得完整。历史 trace 里的类型不会追溯修改。
+
+**已知的行为不一致（只登记，未修）**：`generate` 节点有**两套规则文案模板**，同为"没走成 LLM 润色"的理由，用户看到的文字却不同：
+
+| 场景 | 代码位置 | 后缀 |
+| --- | --- | --- |
+| `recommendation_shortfall` 补齐的那条 | `agents/nodes.py:240-245` | **无**（`命中你的需求「{query}」的混合检索第 {rank} 名结果`） |
+| `generate_fallback` 整段兜底 | `agents/nodes.py:336` | **有**（同模板 + 「（未启用 LLM 润色，由规则兜底生成）」） |
+
+这是既有行为，`agents/` 冻结期**只登记不改**（会改变对外文案，属行为变更），已记录为 [`failed-features.md`](./failed-features.md) F19。
+
 
 - 命名规则：**动词开头、低基数、不含动态值**；动态信息进 metadata。
 - LLM 调用必须记为 `generation` 并带 `model` + `usage_details`，否则成本 / Token 视图为空。
@@ -315,6 +337,28 @@ async def search_recipes(query: str, filters: dict, top_k: int = 10) -> list[dic
 - 短生命周期进程（脚本、离线评估）结束前必须 `flush()`。
 - ⚠️ **读取 trace 一律走 Observations API v2**（`client.api.observations.get_many`）。2026-09-16 之后创建的 Langfuse 组织访问旧 `/api/public/traces` 会返回 `410 LEGACY_API_UNAVAILABLE_FOR_NEW_ORGANIZATION`。
 - 密钥、密码、完整用户身份、真实联系方式**绝不进 trace**；忌口/过敏原等敏感个人数据进 metadata 前先脱敏或只记数量
+
+### 4.6 语料变更后的证据链纪律（2026-10-11 起）
+
+> 起因：解析层噪声清理后重灌，`hybrid` 的 Recall@5 从 59.58% 变成 61.25%。**这不是 bug，是预期效应**——
+> 卡片文档 = 菜名 + 简介 + **食材**，食材变了 embedding 就变了，检索排序必然变。
+> 但中间偷懒一步，留下的就是一组**不可信的数字**。
+
+**只要改动会影响「卡片文档」或「索引词项」**（解析器、`rag/chunking.py`、`rag/tokenization.py`、embedding 模型、词表），**必须**按顺序走完：
+
+| 步骤 | 命令 / 动作 | 为什么不能省 |
+| --- | --- | --- |
+| 1. 留底 | 复制 `data/eval/reports/*.json` 到 `.tmp/eval_reports_before/` | 没有旧值就无法判断"变好还是变坏" |
+| 2. 重灌 | `python -m scripts.import_howtocook` → `python -m scripts.seed_recipes` | 幂等设计保证可重复跑 |
+| 3. **重建索引** | `python -m scripts.build_index`（卡片 + 步骤两层） | **最容易漏的一步**：不重建则库里向量对应旧文本，指标会"看起来没变"却完全不可信 |
+| 4. 校验标注 | `python -m scripts.eval --validate-only` → 必须 **40/40** | 若某条标注菜名消失，说明过滤过头了，**这是严重回归，必须回退那一条规则** |
+| 5. 全量重跑 | `--mode all` + `--mode weight`（并检查 `provider_stats.degraded_calls == 0`） | 单组重跑无法比较；被降级污染的数字不可比，要丢弃重跑 |
+| 6. 统一文档 | README / `docs/INTERVIEW.md` / `docs/DATA_SOURCES.md` / `docs/failed-features.md` / `TODO.md` **一次性全换** | **禁止新旧数字混用**——同一张表里混两组语料的数就是自相矛盾 |
+
+**两条硬规矩**：
+
+- **指标因数据变干净而变化是正常结果，不是回退的理由。** 要把"数据更干净"和"指标更好看"分开看。
+- **负面结论必须留档，不许因为不好看就删。** 本项目最值钱的产出恰恰是「混合检索没有赢」这条实测负结论。
 
 ## 五、数据库规范
 
@@ -565,6 +609,8 @@ services:
 | v1.6 | 2026-10-07 | 新增「本地兜底必须同模型」「两个缓存变量都要设」两条规则 | 兜底的正确性前提，踩过重复下载 |
 | v1.7 | 2026-10-07 | 新增「tsv 与 BM25 共用同一 jieba 分词」规则 | T1.6 落地，避免库里词项与检索词项不一致 |
 | v1.8 | 2026-10-09 | §3.1 补「禁 `any` / 禁 `@ts-ignore`」的落地方式（ESLint 核心规则，不用 `@typescript-eslint/*`） | T1.17 实测：`eslint-config-next@14` 不注册该插件，写其规则名会让 lint 全线报错 |
+| v1.9 | 2026-10-11 | 新增 §4.6「语料变更后的证据链纪律」：任何改变卡片文档/索引的重灌，必须走「留底 → 重灌 → **重建索引** → 校验标注 → 全量重跑 → 一次性统一所有文档数字」；禁止新旧数字混用 | 解析层噪声清理后重灌，`hybrid` R@5 从 59.58% 变成 61.25%——不是 bug 而是卡片文本变了的预期效应；若不重建索引，向量与文本会对不上，指标会"看起来没变"却完全不可信 |
+| v1.10 | 2026-10-11 | §4.5 观察名表维持 v1.7 口径；补记「规则生成的推荐理由有两套模板」这一已知不一致（`shortfall` 补齐 vs `generate_fallback`），登记为 `failed-features.md` F19 | 同为规则文案却一个带后缀一个不带，属行为变更，冻结期只登记不改 |
 
 **迭代规则**：
 
