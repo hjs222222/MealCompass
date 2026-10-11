@@ -61,6 +61,13 @@ jobs:
           path: backend/coverage.xml
           if-no-files-found: ignore
 
+      - name: Docs consistency gate (README numbers vs docs/evidence)
+        # 把"正文数字必须能追到 docs/evidence"从靠人自觉变成 CI 门禁：
+        # README 评估表的每个指标格对账 docs/evidence/eval_reports_summary.json，
+        # 区间格子必须等于 rerank_variance.txt 的跨轮极差，来源路径必须真实存在。
+        # 改了 README 的数字却没重跑证据 → 这一步红。见 docs/CONVENTIONS.md §4.6。
+        run: uv run python -m scripts.check_docs_consistency
+
   frontend:
     name: Frontend (typecheck + lint + build)
     runs-on: ubuntu-latest
