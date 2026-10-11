@@ -22,8 +22,9 @@ export default function DashboardPage() {
       <StatusPanel />
 
       <p className="max-w-2xl text-sm leading-relaxed text-stone-600">
-        页面刻意不展示推荐结果：推荐 Agent、菜谱详情与购物清单尚未实现，虚假占位会误导使用者。
-        未完成能力统一记录在 <code className="font-mono text-xs">docs/failed-features.md</code>。
+        本页只做「服务是否活着」的探针，<strong>不</strong>展示推荐结果——推荐链路在{" "}
+        <code className="font-mono text-xs">/recommend</code> 页。菜谱详情、购物清单等未完成能力统一记录在{" "}
+        <code className="font-mono text-xs">docs/failed-features.md</code>，不用虚假占位充数。
       </p>
     </div>
   );

@@ -21,14 +21,20 @@ export default function HomePage() {
       <header className="space-y-3">
         <h1 className="font-serif text-3xl tracking-tight text-stone-800 md:text-4xl">MealCompass</h1>
         <p className="max-w-xl text-sm leading-relaxed text-stone-600 md:text-base">
-          按你的忌口、可用时间和厨具，推荐能真正做出来的家常菜。当前仓库处于 M1 阶段，前端只完成了骨架与数据层。
+          按你的忌口、可用时间和厨具，推荐能真正做出来的家常菜。当前仓库处于 M1 阶段：推荐接口与页面已打通，登录、菜谱详情与购物清单仍未实现。
         </p>
       </header>
 
       <div className="flex flex-wrap gap-4">
         <Link
-          href="/dashboard"
+          href="/recommend"
           className="rounded-full bg-stone-800 px-6 py-3 font-medium text-stone-50 transition-colors duration-300 hover:bg-stone-700"
+        >
+          开始推荐
+        </Link>
+        <Link
+          href="/dashboard"
+          className="rounded-full border border-stone-300 px-6 py-3 font-medium text-stone-800 transition-colors duration-300 hover:bg-stone-100"
         >
           查看服务状态
         </Link>
@@ -44,15 +50,16 @@ export default function HomePage() {
         <Card title="本阶段已完成">
           <ul className="list-disc space-y-1 pl-5">
             <li>Next.js App Router 骨架与路由组</li>
-            <li>类型安全 API 客户端（/health、/version）</li>
+            <li>类型安全 API 客户端（/health、/version、/recommend、/recipes/search）</li>
             <li>TanStack Query 服务端状态 + Zustand 界面状态</li>
-            <li>加载 / 错误 / 空状态与重试</li>
+            <li>推荐接口 + Agent 闭环页面（规则硬约束检索 + LLM 生成理由的最小闭环）</li>
+            <li>加载 / 空 / 错误 / 无解 / 降级状态与重试</li>
           </ul>
         </Card>
         <Card title="尚未实现">
           <ul className="list-disc space-y-1 pl-5">
             <li>注册与登录（T2.15）</li>
-            <li>推荐 Agent 与对话（T2.16-T2.26）</li>
+            <li>多轮对话式推荐（T2.16-T2.26 中的对话部分）</li>
             <li>菜谱详情与购物清单（T2.27、T3.1）</li>
             <li>前端自动化测试</li>
           </ul>

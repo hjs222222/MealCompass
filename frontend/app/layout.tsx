@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 
 const NAV_LINKS = [
   { href: "/", label: "首页" },
+  { href: "/recommend", label: "推荐" },
   { href: "/dashboard", label: "服务状态" },
   { href: "/login", label: "登录" },
 ] as const;
