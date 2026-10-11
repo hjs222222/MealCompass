@@ -501,9 +501,14 @@ pnpm typecheck && pnpm lint && pnpm build
 $ .venv\Scripts\python.exe -m pytest -q -p no:cacheprovider --cov=domain --cov=rag --cov=infra \
     --cov=core --cov=api --cov=agents --cov=services --cov=main --cov-report=term
 TOTAL                              1669     66    96%
-519 passed, 4 skipped in 53.82s
+547 passed, 4 skipped in 53.24s
 $ .venv\Scripts\python.exe -m ruff check .          → All checks passed!
-$ .venv\Scripts\python.exe -m ruff format --check . → 92 files already formatted
+$ .venv\Scripts\python.exe -m ruff format --check . → 94 files already formatted
+$ .venv\Scripts\python.exe -m scripts.check_docs_consistency
+[OK] README 与 docs/evidence 全部一致
+     对账报告 4 份：ablation_weight.json(49de57b9eb18f383), hybrid.json(60cacb548cedb9d8),
+                    hybrid_rerank.json(012b3a433c992ddc), vector.json(e637d1eaba54bb1b)
+     指标格 12 个全部覆盖；区间格子与跨轮极差一致；来源标注全部存在
 ```
 
 覆盖率**最低的三个模块也一并说清，不藏**（补齐前的旧值 → 现在）：

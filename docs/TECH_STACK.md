@@ -224,7 +224,7 @@ backend/
 | ------------------------ | ------------------ | ----------------------------------- |
 | **uv**             | Python 包管理      | 比 pip 快 10-100x，AI 生成友好      |
 | **Ruff**           | Linter + Formatter | 替代 flake8 + black + isort         |
-| **pytest**         | 测试               | **实测 519 passed / 4 skipped，生产代码覆盖率 96%**（门禁 ≥ 70%） |
+| **pytest**         | 测试               | **实测 547 passed / 4 skipped，生产代码覆盖率 96%**（门禁 ≥ 70%） |
 | **Docker Compose** | 本地全栈启动       | 一条命令起 PG + Redis + 后端 + 前端（**Redis 当前只起容器，代码未用**） |
 | **Langfuse**       | LLM 可观测         | 自托管或 Cloud                      |
 | **GitHub Actions** | CI                 | Lint + Test + Build                 |

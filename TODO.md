@@ -36,8 +36,9 @@
 - [X] **W3.3 工程门禁**：`.github/workflows/ci.yml`（ruff + pytest 覆盖率 ≥ 70% + 前端三检查），7 条命令本地实跑
 - [X] **W3.4 面试材料**：`docs/INTERVIEW.md`（简历三版本 + 自我介绍三时长 + 分主题深挖 Q&A + 承认答不上来的对照表）
 - [X] **W3.5 数据质量收尾（本次追加）**：解析层噪声清理（章节标题 / 说明句 / 缩放规则 / 工具分流 / 并列写法拆分），归一化率 73.5% → 75.3%，待确认用量 86 → 25 条；重灌 + 重建双层索引（372 卡片 + 3,806 步骤）；重跑三组评估确认结论未变
-- [X] **W3.6 覆盖率补强（本次追加）**：补齐 `infra/db.py`（64% → **100%**，`create_async_engine` 惰性故无需真库）、`infra/observability.py`（75% → **94%**，注入假 langfuse 模块覆盖启用路径）、`api/deps.py`（80% → **100%**，装配链 + 关闭失败分支）。**生产代码覆盖率 93% → 96%**，测试 456 → **519 passed / 4 skipped**。过程中踩到并修掉「用例间 `os.environ` 污染导致单跑绿、全量 6 红」，登记在 `docs/mistakes.md`
-- [X] **W3.7 证据入库与端到端复现（本次追加）**：新增 4 个入库脚本（`e2e_probe` / `e2e_latency_summary` / `summarize_eval_reports` / `channel_attribution` / `rerank_variance`）与 28 项针对它们纯函数的单测；原始输出与前后报告统一入库到 `docs/evidence/`（3 轮端到端 + 聚合区间表 + 评估摘要含 SHA256 + 抖动 + 归因 + 清理前/后 `import_report`），**含那次字段写死的误报留档** `e2e_run1_OLD_PROBE_field_bug.txt`；README 端到端表由单值改为**多轮区间 + 极差**，并如实写明 `degraded` 在三轮中会翻转
+- [X] **W3.6 覆盖率补强（本次追加）**：补齐 `infra/db.py`（64% → **100%**，`create_async_engine` 惰性故无需真库）、`infra/observability.py`（75% → **94%**，注入假 langfuse 模块覆盖启用路径）、`api/deps.py`（80% → **100%**，装配链 + 关闭失败分支）。**生产代码覆盖率 93% → 96%**，测试 456 → **547 passed / 4 skipped**。过程中踩到并修掉「用例间 `os.environ` 污染导致单跑绿、全量 6 红」，登记在 `docs/mistakes.md`
+- [X] **W3.7 证据入库与端到端复现（本次追加）**：新增 5 个入库脚本（`e2e_probe` / `e2e_latency_summary` / `summarize_eval_reports` / `channel_attribution` / `rerank_variance`）与 28 项针对它们纯函数的单测；原始输出与前后报告统一入库到 `docs/evidence/`（3 轮端到端 + 聚合区间表 + 评估摘要含 SHA256 + 抖动 + 归因 + 清理前/后 `import_report`），**含那次字段写死的误报留档** `e2e_run1_OLD_PROBE_field_bug.txt`；README 端到端表由单值改为**多轮区间 + 极差**，并如实写明 `degraded` 在三轮中会翻转
+- [X] **W3.8 数字对账进 CI（本次追加）**：新增 `backend/scripts/check_docs_consistency.py` + 28 项单测，把「正文数字必须能追到 `docs/evidence/`」从**靠人自觉**变成**跑一条命令就知道**——① README 评估表每个指标格对账 `eval_reports_summary.json`；② `hybrid_rerank` 的区间格子必须**恰好等于** `rerank_variance.txt` 的跨轮极差（手写一个"差不多"的区间会被抓）；③ README 引用的每个证据路径必须真实存在。已作为独立步骤进 CI。**并做了篡改自检**：把 R@5 改成 99.99% → exit 1；引用不存在的证据文件 → exit 1。测试数 519 → **547 passed / 4 skipped**
 
 **明确不做（三周内）**：注册登录、购物清单、一周菜单、烹饪指导模式、语音、长期记忆、多智能体、A/B 实验、付费。
 
