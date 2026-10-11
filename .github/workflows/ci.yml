@@ -42,7 +42,7 @@ jobs:
       - name: Tests with coverage gate
         # Coverage counts production code only (domain/rag/infra/core/api/agents/services/main.py).
         # tests/ and scripts/ are excluded on purpose so the number is not diluted.
-        # Local reference (2026-10-11): TOTAL 1669 stmts / 66 miss / 96%, 491 passed, 4 skipped.
+        # Local reference (2026-10-11): TOTAL 1669 stmts / 66 miss / 96%, 519 passed, 4 skipped.
         # The 4 skips are environmental (sentence-transformers not installed; live-remote smoke needs keys),
         # each with an explicit reason in the test itself.
         run: >
