@@ -99,6 +99,90 @@ NON_NUMERIC_AMOUNTS = ("适量", "少许", "若干", "随量", "按需", "看情
 PROSE_MAX_LEN = 20
 PROSE_MIN_LEN = 12
 
+#: 列表里混进来的**章节小标题**（清洗掉冒号/空白后精确匹配）。它们既不是食材也不是厨具。
+SECTION_HEADINGS = frozenset(
+    {
+        "工具",
+        "原料",
+        "食材",
+        "调料",
+        "配料",
+        "调味料",
+        "调味品",
+        "佐料",
+        "辅料",
+        "厨具",
+        "主料",
+        "必备原料和工具",
+        "原料和工具",
+        "主要原料",
+        "所需原料",
+        "所需食材",
+    }
+)
+
+#: 只有虚词、没有实体的行（真实 report 的 unmapped_top 里出现过）
+SCALAR_ONLY_NAMES = frozenset(
+    {"一般", "左右", "适量", "少许", "若干", "随量", "按需", "看情况", "一些", "少量", "都可", "均可"}
+)
+
+#: 名字里含这些词说明它是**说明句**而不是食材名（如「盐的用量为」「一碗容量是」）
+PROSE_NAME_MARKERS = (
+    "用量",
+    "容量",
+    "体积",
+    "重量",
+    "数量",
+    "比例",
+    "浓度",
+    "直径",
+    "厚度",
+    "长度",
+    "宽度",
+    "分量",
+    "份量",
+    "克数",
+    "斤数",
+    "时间",
+)
+#: 以这些词开头的行是描述而不是名字（如「根据口味选择加或者不加糖」）
+PROSE_NAME_PREFIXES = ("根据", "其中", "原则", "调一个", "一般", "每份", "一碗")
+#: 名字里含这些片段说明是整句说明
+PROSE_NAME_SUBSTRINGS = (
+    "可以食用",
+    "可准备",
+    "可忽略",
+    "可制作",
+    "足够",
+    "取决于",
+    "黑暗料理",
+    "需要",
+)
+#: 用量表达式里引用这些**非食材变量**时，该行是「缩放规则」而不是一份食材清单
+PROSE_AMOUNT_VARIABLES = ("份数",)
+
+#: 名字尾部残留的说明后缀：「盐**的用量为**」「鸡腿肉**用量通常来说为**」。
+#: 只认**说明量词**（用量/容量/…），不认裸「量」——`盐量` / `肉量` 是真实名字。
+NAME_SUFFIX_RE = re.compile(
+    r"(?:的)?(?:用量|容量|体积|重量|数量|分量|份量|克数|斤数|比例|浓度|直径|厚度|长度|宽度)"
+    r"(?:通常来说|一般来说|一般|大概|大约|通常)?(?:为|是)?$"
+)
+
+#: 并列写法分隔符：上游大量使用「A、B、C」「A/B/C」「A + B」。
+#: 三种情况**不算**分隔符：
+#: 1. 两侧是数字 —— 否则「- 洋葱 1/2 个」会被拆坏；
+#: 2. 后面跟「人 / 份 / 位 / 天 / 餐」—— 那是**每人份**标记（`黄瓜 100g/人`），
+#:    不是并列；它会被 :func:`_parse_amount` 当作 tail 留在 note 里。
+ENUMERATION_SEP_RE = re.compile(r"(?<!\d)(?<!\d[ \t])[、/+](?![ \t]*(?:\d|人|份|位|天|餐))")
+#: 拆分前先切掉的「总量说明」尾巴（「葱、姜、蒜共 15 克」「洋葱总量 = …」）
+ENUMERATION_TAIL_RE = re.compile(r"(?:总量|总用量|共|合计|以上).*$")
+#: markdown 相对链接：`[蔗糖糖浆](../../condiment/蔗糖糖浆.md)` → 取链接文字。
+#: 不处理的话，链接 URL 里的 `/` 会被并列拆分规则切出一个叫 `..` 的假食材。
+MD_LINK_RE = re.compile(r"\[(?P<text>[^\]]*)\]\([^()]*(?:\([^()]*\)[^()]*)*\)")
+#: 行首标签：「[可选]」「必备：」这类前缀要剥掉再识别
+OPTIONAL_PREFIX_RE = re.compile(r"^\s*(?:\[可选\]|【可选】)\s*")
+REQUIRED_LABEL_RE = re.compile(r"^\s*(?:必备|必需|需要)\s*[:：]\s*")
+
 # 启发式厨具关键词：宁可漏判（归为食材）也不要误伤食材名
 TOOL_KEYWORDS = (
     "炒锅",
@@ -177,6 +261,35 @@ TOOL_KEYWORDS = (
     "模具",
     "裱花袋",
     "棉线",
+    "厨房纸",
+    "吸油纸",
+    "水果刀",
+    "压汁器",
+    "手动压汁器",
+    "分蛋器",
+    "隔热手套",
+    "一次性手套",
+    "一次性塑料手套",
+    "锡箔纸",
+    "铝箔纸",
+    "捣药罐",
+    "定时器",
+    "小碗",
+    "碗",
+    "盆",
+    "盘子",
+    "蒜臼",
+    # 调酒器具（上游饮品分类里成批出现，之前全被当成食材）
+    "吧勺",
+    "量酒器",
+    "调酒杯",
+    "雪克杯",
+    "雪克瓶",
+    "海波杯",
+    "高球杯",
+    "利口酒杯",
+    "冰桶",
+    "榨汁机",
 )
 
 
@@ -289,19 +402,66 @@ def _split_name_and_amount(core: str) -> tuple[str, str | None]:
     return core.strip(), None
 
 
-def _looks_like_prose(name: str) -> bool:
-    """「必备原料和工具」里混有整句说明（如「北方大米，米和水放在电饭煲的容器内…」）。"""
+def _clean_label(name: str) -> str:
+    """剥掉行首标签（``[可选] 分蛋器`` / ``必备：厨房纸``）。"""
+    cleaned = OPTIONAL_PREFIX_RE.sub("", name)
+    cleaned = REQUIRED_LABEL_RE.sub("", cleaned)
+    return cleaned.strip()
+
+
+def _is_section_heading(name: str) -> bool:
+    """章节小标题（``工具`` / ``原料:``）不是食材，也不是厨具。"""
+    stripped = re.sub(r"\s+", "", name)
+    return stripped.rstrip(":：。").strip() in SECTION_HEADINGS
+
+
+def _looks_like_prose(name: str, rest: str | None = None) -> bool:
+    """判断一行是「整句说明」而不是「食材名」。
+
+    真实 ``unmapped_top`` 里的噪声形态（全部来自 HowToCook 语料）：
+
+    * ``盐的用量为 3 g/人`` —— 「用量说明」被当成了名字；
+    * ``一碗容量是 500ml。`` —— 容量说明；
+    * ``一般一个人可以食用 60ml-110ml 的米。`` —— 整句；
+    * ``肉量 = 份数 * 200g。`` —— **缩放规则**，用 ``份数`` 变量；
+    * ``盐量 = 兔肉斤数 * 2 克`` —— 这种**要保留**（``盐量`` 是真实名字），
+      区别就在于右侧是 ``份数`` 还是别的变量，见下方 ``PROSE_AMOUNT_VARIABLES``。
+    """
     if len(name) > PROSE_MAX_LEN:
         return True
-    return len(name) > PROSE_MIN_LEN and bool(PROSE_PUNCT_RE.search(name))
+    if len(name) > PROSE_MIN_LEN and PROSE_PUNCT_RE.search(name):
+        return True
+    if name in SCALAR_ONLY_NAMES:
+        return True
+
+    stripped = name.rstrip(":：。.!！?？,，、")
+    # 「XX用量为 / XX用量为：」是说明句；「盐量」这类真实名字不含「用量」
+    if "用量" in name and stripped.endswith(("为", "是")):
+        return True
+    # 「盐的用量为」这种把说明词粘在名字上的整串，按后缀模式丢弃
+    if NAME_SUFFIX_RE.search(name):
+        return True
+    # 说明句特征词。**只在名字上判**，不在「名字 = 表达式」的整串上判——
+    # 否则 `盐量 = 兔肉斤数 * 2 克` 会因为右侧的「斤数」被误杀（真实数据里有这种写法）。
+    if any(marker in name for marker in PROSE_NAME_MARKERS):
+        return True
+    if name.startswith(PROSE_NAME_PREFIXES):
+        return True
+    if any(fragment in name for fragment in PROSE_NAME_SUBSTRINGS):
+        return True
+    # 右侧引用了「份数」这类非食材变量 → 这行是缩放规则，不是一份食材清单。
+    # ``_split_name_and_amount`` 已按 ``=`` 拆开，``rest`` 就是右侧表达式本身。
+    return any(variable in (rest or "") for variable in PROSE_AMOUNT_VARIABLES)
 
 
 def _canonical_tool(name: str) -> str | None:
-    """命中厨具关键词就收敛到关键词本身（``烤箱 大小不限`` → ``烤箱``）。"""
-    for keyword in TOOL_KEYWORDS:
-        if keyword in name:
-            return keyword
-    return None
+    """命中厨具关键词就收敛到关键词本身（``烤箱 大小不限`` → ``烤箱``）。
+
+    取**最长**命中词：否则 ``手动压汁器`` 会先撞上 ``压汁器`` 收敛成短名，
+    丢失「手动」这一区分信息。
+    """
+    hits = [keyword for keyword in TOOL_KEYWORDS if keyword in name]
+    return max(hits, key=len) if hits else None
 
 
 # --------------------------------------------------------------------------- 单行解析
@@ -311,10 +471,18 @@ def parse_ingredient_line(line: str) -> Ingredient:
     """解析一行食材 / 厨具。支持三种真实写法：
 
     ``- 鳝丝 400 g`` ／ ``- 小龙虾 = 2 斤`` ／ ``- 椰浆 100ml*份数``
+
+    返回 ``name == ""`` 表示这一行**既不是食材也不是厨具**（章节小标题、
+    整句说明、虚词）——调用方必须丢弃它，不能塞进 ``ingredients``。
     """
     bullet = BULLET_RE.match(line.strip())
     body = bullet.group("body") if bullet else line.strip()
+    body = _clean_label(body)
     if not body:
+        return Ingredient(name="")
+
+    # 章节小标题（「工具」「原料:」）必须最先判：否则会被当成厨具混进 recipe.tools
+    if _is_section_heading(body):
         return Ingredient(name="")
 
     notes = [n.strip() for n in PAREN_RE.findall(body) if n.strip()]
@@ -329,13 +497,24 @@ def parse_ingredient_line(line: str) -> Ingredient:
     if not name:
         return Ingredient(name="")
 
+    # 拆分后名字可能带上「总量」尾巴（「洋葱总量」），再洗一次
+    name = re.sub(r"(?:总量|总用量)$", "", name).strip()
+    name = _clean_label(name).rstrip(":：。").strip()
+    if not name:
+        return Ingredient(name="")
+
+    # 收敛前先判一次标题/说明：`不粘锅：油汇聚成滴后…` 这类厨具开头的整句
+    # 会被 `_split_name_and_amount` 按 `：` 切开，名字本身已看不出是整句。
+    if _is_section_heading(name):
+        return Ingredient(name="")
+
     canonical = _canonical_tool(name)
-    if _looks_like_prose(name):
-        # 整句说明：只有以厨具开头时才当厨具，否则整行丢弃（既不是食材也不是厨具）
-        if not (canonical and name.startswith(canonical)):
-            return Ingredient(name="")
-        name = canonical
-    elif canonical:
+    # 整句说明：只有**以厨具名开头**时才当厨具（`不粘锅：油汇聚成滴后…`），
+    # 否则整行丢弃（既不是食材也不是厨具）。
+    prose_without_tool = _looks_like_prose(name, rest) and not (canonical is not None and name.startswith(canonical))
+    if prose_without_tool:
+        return Ingredient(name="")
+    if canonical:
         name = canonical
 
     low, high, unit, tail = _parse_amount(rest) if rest else (None, None, None, None)
@@ -353,6 +532,57 @@ def parse_ingredient_line(line: str) -> Ingredient:
         optional=optional,
         per_serving=per_serving,
     )
+
+
+def _bullet_body(line: str) -> str:
+    """去掉列表符号与行首标签，拿到条目正文。"""
+    bullet = BULLET_RE.match(line.strip())
+    body = bullet.group("body") if bullet else line.strip()
+    return _clean_label(body)
+
+
+def parse_ingredient_lines(line: str) -> list[Ingredient]:
+    """把一行拆成**一个或多个**食材 / 厨具。
+
+    上游大量使用并列写法（``A、B、C`` / ``A/B/C`` / ``A + B``）。这里选择
+    **拆分而不是丢弃**：这些名字里有真实食材（``葱、姜、蒜``），丢掉会让菜谱少料
+    （检索与购物清单都会失真）；拆开则每味都能各自归一化。
+
+    **只负责拆分**，两件事刻意不做：
+
+    1. 不判断工具 / 食材（由 :func:`parse_ingredient_line` 与整篇解析器负责）；
+    2. **不给拆出来的每一项摊派用量**——上游写的是「总量」，
+       平摊到每味上就是编造数字。
+
+    返回空 list 表示这一行不是食材（章节小标题、整句说明、虚词）。
+    """
+    single = parse_ingredient_line(line)
+    if not single.name:
+        return []
+
+    # 先把 markdown 链接替换成链接文字，再考虑拆分
+    body = MD_LINK_RE.sub(lambda m: m.group("text"), _bullet_body(line))
+    # 「糖浆（可选）」这类说明文字会被真正拆开，丢掉则拆出的名字不完整
+    body = PAREN_RE.sub(" ", body)
+    body = ENUMERATION_TAIL_RE.sub("", body).strip().rstrip("、+/ ").strip()
+    if not body:
+        return []
+
+    parts = [ENUMERATION_TAIL_RE.sub("", part).strip() for part in ENUMERATION_SEP_RE.split(body)]
+    parts = [part for part in parts if part]
+    if len(parts) <= 1:
+        return [single]
+
+    optional = "可选" in line
+    items: list[Ingredient] = []
+    for part in parts:
+        item = parse_ingredient_line(part)
+        if not item.name:
+            continue
+        if optional and not item.optional:
+            item = item.model_copy(update={"optional": True})
+        items.append(item)
+    return items
 
 
 # --------------------------------------------------------------------------- 整篇解析
@@ -452,18 +682,16 @@ def parse_recipe_markdown(
     # 先吃「计算」（每份精确用量），再用「必备原料和工具」补名字与厨具
     for body, authoritative in ((sections["计算"], True), (sections["必备原料和工具"], False)):
         for line in _bullet_lines(body):
-            item = parse_ingredient_line(line)
-            if not item.name:
-                continue
-            if item.kind == "tool":
-                if item.name not in tools:
-                    tools.append(item.name)
-                continue
-            item = _normalize(item, dictionary)
-            if authoritative:
-                ingredients[item.name] = item
-            else:
-                ingredients.setdefault(item.name, item)
+            for item in parse_ingredient_lines(line):
+                if item.kind == "tool":
+                    if item.name not in tools:
+                        tools.append(item.name)
+                    continue
+                item = _normalize(item, dictionary)
+                if authoritative:
+                    ingredients[item.name] = item
+                else:
+                    ingredients.setdefault(item.name, item)
 
     calories = parse_calories(text)
     images, external_images = extract_images(text, source_path)

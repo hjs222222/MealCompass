@@ -15,6 +15,7 @@ from scripts.import_howtocook import (
     parse_calories,
     parse_difficulty,
     parse_ingredient_line,
+    parse_ingredient_lines,
     parse_recipe_markdown,
 )
 
@@ -362,3 +363,287 @@ def test_parse_recipe_applies_ingredient_dictionary() -> None:
 def test_parse_recipe_without_dictionary_leaves_canonical_empty() -> None:
     recipe = parse_recipe_markdown(FIXTURE, source_path="meat_dish/葱烧鸡腿.md")
     assert all(item.canonical is None for item in recipe.ingredients)
+
+
+# ------------------------------------------------ 解析层噪声过滤（T1.2c / C5）
+
+# 「必备原料和工具」里混进来的章节小标题：整行不是食材，也不是厨具
+SECTION_HEADING_LINES = [
+    "- 工具",
+    "* 工具",
+    "- 原料",
+    "- 原料:",
+    "- 原料：",
+    "- 食材",
+    "- 调料",
+    "- 配料",
+    "- 调味料",
+    "- 厨具",
+    "- 主料",
+    "- 必备原料和工具",
+    "- 原料和工具",
+    "  - 工具  ",
+]
+
+
+@pytest.mark.parametrize("line", SECTION_HEADING_LINES)
+def test_section_headings_are_not_ingredients(line: str) -> None:
+    """章节小标题（工具 / 原料:）被当成食材是 unmapped_top 里的头号噪声。"""
+    item = parse_ingredient_line(line)
+    assert item.name == ""
+    assert item.kind == "ingredient"
+
+
+# 说明短语 / 整句说明：不是食材名
+PROSE_ONLY_LINES = [
+    "- 肉量 = 份数 * 200g。",
+    "* 肉量 = 份数 * 100g",
+    "- 盐的用量为 1 g 每个鸡蛋。",
+    "* 盐的用量为 3 g/人",
+    "- 一般一个人可以食用 7～10 个水饺",
+    "- 一般一个人可以食用 60ml-110ml 的米。",
+    "* 一般一个人一顿可以食用",
+    "* 一碗容量是 500ml。",
+    "- 一个水饺约需要本身体积两倍的水",
+    "- 中断大火加热的最晚时间 T",
+    "- 冷藏时间 Tc",
+    "- 水的体积是米饭的体积的",
+    "- 果酱足够涂满一面吐司的量",
+    "- 根据口味选择加或者不加糖",
+    "- 根据锅的类型决策不同量的油",
+    "- 每份原料可制作",
+    "- 淀粉可准备每",
+    "- 其中青菜体积可忽略",
+    "- 原则：万物皆可酿",
+    "- 调一个灵魂料汁儿",
+    "- 非黑暗料理🍆",
+    "- 鸡腿肉用量通常来说为",
+]
+
+
+@pytest.mark.parametrize("line", PROSE_ONLY_LINES)
+def test_prose_lines_are_not_ingredients(line: str) -> None:
+    """整句说明是「不编造」的反面：它没有名字，也没有用量，不能进库。"""
+    assert parse_ingredient_line(line).name == ""
+
+
+# 「XX用量为」这类把「用量说明」和「食材名」揉在一起的行，命名规则高度统一
+AMOUNT_PHRASE_LINES = [
+    "- 盐的用量为 3 g/人",
+    "- 盐用量为 3 g/人",
+    "- 盐的用量为：3g",
+    "- 牛肉用量为 250 g",
+    "- 鸡蛋用量为 1 个",
+    "- 食用油的用量为 9 ml",
+    "- 生抽酱油用量为 15ml",
+    "- 孜然用量为 2 克",
+    "- 十三香的用量为：3g",
+    "- 热水的用量为：100ml",
+    "- 鸡腿肉用量通常来说为 200 克",
+]
+
+
+@pytest.mark.parametrize("line", AMOUNT_PHRASE_LINES)
+def test_amount_phrase_lines_are_not_ingredients(line: str) -> None:
+    """「盐的用量为 3g/人」是说明句，不是食材名（食材名里的「量」另有规则，见下）。"""
+    assert parse_ingredient_line(line).name == ""
+
+
+# 厨具 / 耗材：必须归 kind="tool"，而不是当食材
+TOOL_LINES = [
+    "- 手动压汁器",
+    "- 水果刀",
+    "- 厨房纸",
+    "- 厨房纸（可选）",
+    "- 必备：厨房纸",
+    "- 小碗（调酱汁用）",
+    "- 小碗若干",
+    "- 雪克杯",
+    "- 雪克瓶",
+    "- 量酒器",
+    "- 调酒杯",
+    "- 吧勺",
+    "- 海波杯",
+    "- 高球杯",
+    "- 利口酒杯",
+    "- 隔热手套",
+    "- 一次性手套",
+    "- 一次性塑料手套",
+    "- 锡箔纸",
+    "- 铝箔纸",
+    "- 压汁器",
+    "- 定时器",
+    "[可选] 分蛋器",
+    "- 捣药罐",
+]
+
+
+@pytest.mark.parametrize("line", TOOL_LINES)
+def test_tools_and_consumables_are_classified_as_tool(line: str) -> None:
+    """工具/耗材应进 recipe.tools；漏判会同时污染 ingredients 与 unmapped_top。"""
+    item = parse_ingredient_line(line)
+    assert item.kind == "tool"
+    assert item.name != ""
+
+
+TOOL_NAMES = [
+    "手动压汁器",
+    "水果刀",
+    "厨房纸",
+    "小碗",
+    "雪克杯",
+    "量酒器",
+    "隔热手套",
+    "锡箔纸",
+    "压汁器",
+    "定时器",
+    "分蛋器",
+    "捣药罐",
+]
+
+
+@pytest.mark.parametrize("name", TOOL_NAMES)
+def test_tool_names_are_canonicalized(name: str) -> None:
+    """「厨房纸（可选）」这类带括号/前缀的写法要收敛到关键词本身。"""
+    assert parse_ingredient_line(name).name == name
+    assert parse_ingredient_line(f"- 必备：{name}").name == name
+
+
+def test_consumable_capacity_phrase_is_not_a_tool() -> None:
+    """「一碗容量是 500ml。」是容量说明，不是碗这个厨具。"""
+    assert parse_ingredient_line("- 一碗容量是 500ml。").name == ""
+
+
+# 并列写法：拆成多个食材（而不是丢弃，也不是保留成一条假食材）
+ENUMERATED_CASES = [
+    ("- 葱、姜、蒜", ["葱", "姜", "蒜"]),
+    ("* 葱、姜、蒜", ["葱", "姜", "蒜"]),
+    ("- 葱、姜、蒜共 15 克", ["葱", "姜", "蒜"]),
+    ("- 小葱/大葱/洋葱总量 = 兔肉斤数 * 15 克", ["小葱", "大葱", "洋葱"]),
+    ("- 五花肉/瘦肉", ["五花肉", "瘦肉"]),
+    ("- 盐、糖", ["盐", "糖"]),
+    ("- 葱、姜", ["葱", "姜"]),
+    ("- 蒜末、姜末", ["蒜末", "姜末"]),
+    ("- 肉丁/肉末", ["肉丁", "肉末"]),
+    ("- 白醋/米醋", ["白醋", "米醋"]),
+    ("- 八角、干辣椒", ["八角", "干辣椒"]),
+    ("- 黄瓜、大蒜、绿豆芽", ["黄瓜", "大蒜", "绿豆芽"]),
+    ("- 生抽 / 味极鲜", ["生抽", "味极鲜"]),
+    ("- 盐 + 鸡精 +", ["盐", "鸡精"]),
+]
+
+
+@pytest.mark.parametrize(("line", "expected"), ENUMERATED_CASES)
+def test_enumerated_lines_are_split_into_separate_ingredients(line: str, expected: list[str]) -> None:
+    """上游大量使用「A、B、C」「A/B/C」合并写法。
+
+    选择**拆分**而不是丢弃：这些名字里有真实食材（葱姜蒜），
+    丢掉会让菜谱少料（检索/购物清单都会失真）；拆开则每味都能各自归一化。
+    """
+    items = parse_ingredient_lines(line)
+    assert [item.name for item in items] == expected
+    assert all(item.kind == "ingredient" for item in items)
+
+
+def test_single_ingredient_line_still_returns_one_item() -> None:
+    items = parse_ingredient_lines("- 鸡腿 2 个（约 500g）")
+    assert [item.name for item in items] == ["鸡腿"]
+    assert items[0].amount_min == 2.0
+
+
+def test_prose_line_returns_no_items() -> None:
+    assert parse_ingredient_lines("- 一般一个人可以食用 60ml-110ml 的米。") == []
+
+
+def test_tool_line_is_split_targeted_by_parser_contract() -> None:
+    """``parse_ingredient_lines`` 只负责拆分；工具/食材分流由整篇解析器做。"""
+    items = parse_ingredient_lines("- 炒锅")
+    assert [item.name for item in items] == ["炒锅"]
+    assert items[0].kind == "tool"
+
+
+# 成分用量里的「量」是真实名字，不能被「XX量」规则误伤
+INGREDIENT_NAMES_CONTAINING_LIANG = ["盐量", "肉量", "油量", "姜量", "蒜量"]
+
+
+@pytest.mark.parametrize("name", INGREDIENT_NAMES_CONTAINING_LIANG)
+def test_ingredient_names_ending_with_liang_survive(name: str) -> None:
+    """「冷吃兔」里 `兔肉斤数 * 2 克` 的写法把「盐量/肉量」当名字。
+
+    名字里有「量」不等于它是用量说明（`盐的用量为` 才是），不能一刀切。
+    """
+    assert parse_ingredient_line(f"- {name} = 兔肉斤数 * 2 克").name == name
+
+
+def test_prose_scalars_are_not_ingredients() -> None:
+    """「一般」「左右」这类虚词不该单独成行进库（真实 report 里曾出现）。"""
+    for line in ("- 一般", "- 左右", "- 适量", "- 少许"):
+        assert parse_ingredient_line(line).name == ""
+
+
+NOISE_FIXTURE = textwrap.dedent(
+    """\
+    # 噪声样本菜的做法
+
+    用来验证解析层噪声清理。
+
+    预估烹饪难度：★★
+    预估卡路里：100 大卡
+
+    ## 必备原料和工具
+
+    - 工具
+    - 原料:
+    - 五花肉 200g
+    - 葱、姜、蒜
+    - 厨房纸
+    - 手动压汁器
+    - 水果刀
+    - 小碗若干
+    - 盐
+
+    ## 计算
+
+    - 肉量 = 份数 * 200g。
+    - 盐的用量为 3 g/人
+    - 一般一个人可以食用 60ml-110ml 的米。
+
+    ## 操作
+
+    1. 五花肉切片。
+    2. 下锅炒。
+    """
+)
+
+EXPECTED_NOISE_INGREDIENTS = ["五花肉", "葱", "姜", "蒜", "盐"]
+EXPECTED_NOISE_TOOLS = ["厨房纸", "手动压汁器", "水果刀", "小碗"]
+
+
+def test_recipe_drops_section_headings_and_prose_rows() -> None:
+    recipe = parse_recipe_markdown(NOISE_FIXTURE, source_path="meat_dish/噪声样本.md")
+    names = [item.name for item in recipe.ingredients]
+
+    for noise in ("工具", "原料:", "原料", "肉量", "盐的用量为", "一般一个人可以食用"):
+        assert noise not in names, f"{noise} 仍被当成食材"
+    assert names == EXPECTED_NOISE_INGREDIENTS
+
+
+def test_recipe_routes_tools_and_consumables_to_tools() -> None:
+    recipe = parse_recipe_markdown(NOISE_FIXTURE, source_path="meat_dish/噪声样本.md")
+    for tool in EXPECTED_NOISE_TOOLS:
+        assert tool in recipe.tools, f"{tool} 没被识别成厨具"
+        assert tool not in [item.name for item in recipe.ingredients]
+
+
+def test_recipe_splits_enumerated_ingredient_rows() -> None:
+    recipe = parse_recipe_markdown(NOISE_FIXTURE, source_path="meat_dish/噪声样本.md")
+    names = [item.name for item in recipe.ingredients]
+    assert names.count("葱") == 1 and names.count("姜") == 1 and names.count("蒜") == 1
+
+
+def test_recipe_keeps_section_heading_from_becoming_a_tool() -> None:
+    """「工具」「原料」是标题，不是厨具名：不能因为修 unmapped 就塞进 tools 充数。"""
+    recipe = parse_recipe_markdown(NOISE_FIXTURE, source_path="meat_dish/噪声样本.md")
+    assert "工具" not in recipe.tools
+    assert "原料:" not in recipe.tools
+    assert "原料" not in recipe.tools
