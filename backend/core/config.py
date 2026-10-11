@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-chat"
+    llm_timeout_seconds: float = 60.0  # 单次 /chat/completions 的超时
+    llm_max_retries: int = 3  # 429 / 5xx 的指数退避重试次数（不含首次请求）
 
     # ---- 检索模型（远程优先、本地兜底，D17）----
     embedding_model: str = "BAAI/bge-m3"

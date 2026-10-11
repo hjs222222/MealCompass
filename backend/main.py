@@ -12,7 +12,9 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from api.deps import close_recommend_service
 from api.v1.health import router as health_router
+from api.v1.recommend import router as recommend_router
 from core.config import Settings, get_settings
 from core.exceptions import AppError, ErrorResponse, request_id_context
 from core.logging import configure_logging
@@ -94,7 +96,11 @@ def create_app(settings: Settings | None = None, *, include_test_routes: bool = 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         runtime_settings.validate_runtime()
-        yield
+        try:
+            yield
+        finally:
+            # 释放推荐服务装配出来的 HTTP 连接池（未装配过时是空操作；内部已兜异常）
+            await close_recommend_service()
 
     application = FastAPI(title="mealcompass-backend", version=runtime_settings.app_version, lifespan=lifespan)
     application.dependency_overrides = {}
@@ -125,6 +131,7 @@ def create_app(settings: Settings | None = None, *, include_test_routes: bool = 
 
     application.middleware("http")(request_id_middleware)
     application.include_router(health_router)
+    application.include_router(recommend_router)
 
     if include_test_routes:
 
