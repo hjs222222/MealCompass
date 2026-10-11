@@ -59,7 +59,7 @@ MealCompass 根据用户的**食材库存、时间、厨具、口味偏好、忌
 | 推荐质量 | 用户采纳率（收藏/做过） | ≥ 30%    | **未测量**（无用户，无埋点） |
 | 性能     | P95 响应延迟            | ≤ 3s     | **未达标**：`/recommend` 端到端 9–12 s（`parse` + `generate` 两次串行 chat）；**纯检索 P95 = 859 ms 达标** |
 | 成本     | 单次推荐 Token 成本     | ≤ ¥0.05 | **未计**（Langfuse 已记录 `usage_details`，但没有做成本对账） |
-| 工程质量 | 单元测试覆盖率          | ≥ 70%    | **96%**（生产代码口径，491 passed / 4 skipped）——**达标** |
+| 工程质量 | 单元测试覆盖率          | ≥ 70%    | **96%**（生产代码口径，519 passed / 4 skipped）——**达标** |
 
 > **「Recall@5 ≥ 85%」这个目标值现已从结论口径中删除**：它是拍出来的、没有测量支撑的，实测 63.75%。README 早期版本拿它当过结论，是本次修订要修掉的问题。
 
@@ -544,7 +544,7 @@ UserProfile:
 
 - [X] 模块化单体，非微服务
   - [X] 抽象接口先行（`RecipeRepository` / `Retriever` / `LLMClient`，统一在 `domain/ports.py` 定义 Protocol，`infra/` `rag/` 提供实现）
-- [X] 单测覆盖率 ≥ 70% → **实测 96%**（生产代码口径，491 passed / 4 skipped）
+- [X] 单测覆盖率 ≥ 70% → **实测 96%**（生产代码口径，519 passed / 4 skipped）
 - [X] 换 LLM 供应商 ≤ 1 天工作量 → 走 OpenAI 兼容协议，`build_llm_client(settings)` 单点构造，**换 base_url + model 即可**；`RemoteLLM` 支持注入 `client`/`sleep` 便于离线测试
 
 ---

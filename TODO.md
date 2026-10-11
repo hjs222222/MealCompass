@@ -30,13 +30,14 @@
 - [X] **W2.1 `LLMClient` 实现**：`infra/llm_client.py`（OpenAI 兼容 + 指数退避 + 代码块围栏容错，26 项单测）
 - [X] **W2.2 最小 LangGraph 闭环**：`backend/agents/`（`state.py` / `nodes.py` 453 行 / `graph.py`）
 - [X] **W2.3 接口**：`POST /recommend`、`POST /recipes/search`（薄路由 + `RecommendService` 编排）
-- [X] **W2.4 降级与无解**：LLM 解析失败 → 规则降级；硬约束无候选 → 显式 `no_solution_reason`（真机复现 2.3 s 短路返回）
+- [X] **W2.4 降级与无解**：LLM 解析失败 → 规则降级；硬约束无候选 → 显式 `no_solution_reason`（真机复现 **2.0–2.2 s** 短路返回，三轮稳定；对比生成路径 9–12 s）
 - [X] **W3.1 前端推荐页**：`/recommend`（表单 + 结果 + 无解 + 降级态，`pnpm build` 5 条路由全过）
 - [X] **W3.2 口径诚实化**：README 全部改为"状态 + 证据"，删除未测量的「Recall@5 ≥ 85%」目标值
 - [X] **W3.3 工程门禁**：`.github/workflows/ci.yml`（ruff + pytest 覆盖率 ≥ 70% + 前端三检查），7 条命令本地实跑
 - [X] **W3.4 面试材料**：`docs/INTERVIEW.md`（简历三版本 + 自我介绍三时长 + 分主题深挖 Q&A + 承认答不上来的对照表）
 - [X] **W3.5 数据质量收尾（本次追加）**：解析层噪声清理（章节标题 / 说明句 / 缩放规则 / 工具分流 / 并列写法拆分），归一化率 73.5% → 75.3%，待确认用量 86 → 25 条；重灌 + 重建双层索引（372 卡片 + 3,806 步骤）；重跑三组评估确认结论未变
-- [X] **W3.6 覆盖率补强（本次追加）**：补齐 `infra/db.py`（64% → **100%**，`create_async_engine` 惰性故无需真库）、`infra/observability.py`（75% → **94%**，注入假 langfuse 模块覆盖启用路径）、`api/deps.py`（80% → **100%**，装配链 + 关闭失败分支）。**生产代码覆盖率 93% → 96%**，测试 456 → **491 passed / 4 skipped**。过程中踩到并修掉「用例间 `os.environ` 污染导致单跑绿、全量 6 红」，登记在 `docs/mistakes.md`
+- [X] **W3.6 覆盖率补强（本次追加）**：补齐 `infra/db.py`（64% → **100%**，`create_async_engine` 惰性故无需真库）、`infra/observability.py`（75% → **94%**，注入假 langfuse 模块覆盖启用路径）、`api/deps.py`（80% → **100%**，装配链 + 关闭失败分支）。**生产代码覆盖率 93% → 96%**，测试 456 → **519 passed / 4 skipped**。过程中踩到并修掉「用例间 `os.environ` 污染导致单跑绿、全量 6 红」，登记在 `docs/mistakes.md`
+- [X] **W3.7 证据入库与端到端复现（本次追加）**：新增 4 个入库脚本（`e2e_probe` / `e2e_latency_summary` / `summarize_eval_reports` / `channel_attribution` / `rerank_variance`）与 28 项针对它们纯函数的单测；原始输出与前后报告统一入库到 `docs/evidence/`（3 轮端到端 + 聚合区间表 + 评估摘要含 SHA256 + 抖动 + 归因 + 清理前/后 `import_report`），**含那次字段写死的误报留档** `e2e_run1_OLD_PROBE_field_bug.txt`；README 端到端表由单值改为**多轮区间 + 极差**，并如实写明 `degraded` 在三轮中会翻转
 
 **明确不做（三周内）**：注册登录、购物清单、一周菜单、烹饪指导模式、语音、长期记忆、多智能体、A/B 实验、付费。
 

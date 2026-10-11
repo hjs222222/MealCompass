@@ -348,17 +348,18 @@ async def search_recipes(query: str, filters: dict, top_k: int = 10) -> list[dic
 
 | 步骤 | 命令 / 动作 | 为什么不能省 |
 | --- | --- | --- |
-| 1. 留底 | 复制 `data/eval/reports/*.json` 到 `.tmp/eval_reports_before/` | 没有旧值就无法判断"变好还是变坏" |
+| 1. 留底 | 复制 `data/eval/reports/*.json` 与 `data/recipes/import_report.json` 到 `.tmp/<name>_before/`，**并把关键报告复制进 `docs/evidence/`（入库）** | 没有旧值就无法判断"变好还是变坏"；只放在 gitignore 的 `.tmp/` 里 = 下次 clone 的人无法对账 |
 | 2. 重灌 | `python -m scripts.import_howtocook` → `python -m scripts.seed_recipes` | 幂等设计保证可重复跑 |
 | 3. **重建索引** | `python -m scripts.build_index`（卡片 + 步骤两层） | **最容易漏的一步**：不重建则库里向量对应旧文本，指标会"看起来没变"却完全不可信 |
 | 4. 校验标注 | `python -m scripts.eval --validate-only` → 必须 **40/40** | 若某条标注菜名消失，说明过滤过头了，**这是严重回归，必须回退那一条规则** |
 | 5. 全量重跑 | `--mode all` + `--mode weight`（并检查 `provider_stats.degraded_calls == 0`） | 单组重跑无法比较；被降级污染的数字不可比，要丢弃重跑 |
 | 6. 统一文档 | README / `docs/INTERVIEW.md` / `docs/DATA_SOURCES.md` / `docs/failed-features.md` / `TODO.md` **一次性全换** | **禁止新旧数字混用**——同一张表里混两组语料的数就是自相矛盾 |
 
-**两条硬规矩**：
+**三条硬规矩**：
 
 - **指标因数据变干净而变化是正常结果，不是回退的理由。** 要把"数据更干净"和"指标更好看"分开看。
 - **负面结论必须留档，不许因为不好看就删。** 本项目最值钱的产出恰恰是「混合检索没有赢」这条实测负结论。
+- **正文数字必须能追到 `docs/evidence/` 的某一行原始输出。** 追不到的数字不许写进 README / 面试材料；连"脚本自己出错导致的误报"也要留档（例：`e2e_run1_OLD_PROBE_field_bug.txt`）。目录说明见 [`evidence/README.md`](./evidence/README.md)。
 
 ## 五、数据库规范
 
@@ -611,6 +612,7 @@ services:
 | v1.8 | 2026-10-09 | §3.1 补「禁 `any` / 禁 `@ts-ignore`」的落地方式（ESLint 核心规则，不用 `@typescript-eslint/*`） | T1.17 实测：`eslint-config-next@14` 不注册该插件，写其规则名会让 lint 全线报错 |
 | v1.9 | 2026-10-11 | 新增 §4.6「语料变更后的证据链纪律」：任何改变卡片文档/索引的重灌，必须走「留底 → 重灌 → **重建索引** → 校验标注 → 全量重跑 → 一次性统一所有文档数字」；禁止新旧数字混用 | 解析层噪声清理后重灌，`hybrid` R@5 从 59.58% 变成 61.25%——不是 bug 而是卡片文本变了的预期效应；若不重建索引，向量与文本会对不上，指标会"看起来没变"却完全不可信 |
 | v1.10 | 2026-10-11 | §4.5 观察名表维持 v1.7 口径；补记「规则生成的推荐理由有两套模板」这一已知不一致（`shortfall` 补齐 vs `generate_fallback`），登记为 `failed-features.md` F19 | 同为规则文案却一个带后缀一个不带，属行为变更，冻结期只登记不改 |
+| v1.11 | 2026-10-11 | §4.6 第 1 步强化：留底不能只放 `.tmp/`（gitignore），**关键报告要复制进 `docs/evidence/`（入库）**，并升级为「三条硬规矩」（新增：正文数字必须能追到 `docs/evidence/` 的原始输出）；新增规矩「端到端脚本不得写死响应字段」「含 LLM 往返的指标默认多次运行给区间」 | 两件事都是真实踩到的：① 探针写死读 `results`（真实字段是 `candidates`），把 5 条候选报成 0 条、差点当成新负结论；② 同代码同语料三轮跑出 12.0/10.4/9.2 s，给单一精确值等于隐藏方差 |
 
 **迭代规则**：
 

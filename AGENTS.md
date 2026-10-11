@@ -345,9 +345,10 @@ pnpm typecheck && pnpm lint && pnpm build
 | 加 / 改食材词表            | `data/ingredients/aliases.yaml` + `backend/domain/ingredients.py` + `import_report.json` 的 `unmapped_top`                             |
 | 加规则                  | `data/rules/*.yaml` + `backend/domain/rules/` + `docs/PRD.md` 模块 D                                                                    |
 | 查 Langfuse 数据        | 用`langfuse` 技能；读取走 **Observations API v2**（旧 `/api/public/traces` 对本组织返回 410）                                                         |
+| 复现评估/端到端数字        | 先看 [`docs/evidence/`](./docs/evidence/README.md)（入库的原始输出 + 复现脚本），再跑 `scripts.eval` / `scripts.e2e_probe`                    |
 
 
 
 ***
 
-**最后更新**：2026-10-11 ｜ 变更：新增 §4.1「多智能体协作纪律」（以共享任务板状态为唯一事实源、write scope 对 Lead 同样生效、广播必须附真实命令输出、共享资源先留底后覆盖、终审由 Lead 独立复跑）——五条规则分别来自本次实际踩过的坑：Lead 越界改 C3 的 `api/deps.py`/`main.py` 卡住链路、Lead 把 `in_progress` 的 task-3 说成已完成导致 `quality` claim 被拒且差点污染 eval 的实测数据。历史：2026-10-07 修复编辑器格式化造成的空行问题、新增 §5.5。
+**最后更新**：2026-10-11 ｜ 变更：**新增「证据入库」纪律**——正文里任何数字都必须能追到 `docs/evidence/` 的原始输出；关键报告（评估摘要、抖动、归因、端到端、清理前后）与**复现脚本**一并入库，连“脚本写死字段名导致误报”的那次输出也留档（`e2e_run1_OLD_PROBE_field_bug.txt`）。同时新增两条来自实际踩坑的规矩：**端到端脚本不得写死响应字段**、**含 LLM 往返的指标默认多次运行给区间**。更早变更：新增 §4.1「多智能体协作纪律」（以共享任务板状态为唯一事实源、write scope 对 Lead 同样生效、广播必须附真实命令输出、共享资源先留底后覆盖、终审由 Lead 独立复跑）——五条规则分别来自本次实际踩过的坑：Lead 越界改 C3 的 `api/deps.py`/`main.py` 卡住链路、Lead 把 `in_progress` 的 task-3 说成已完成导致 `quality` claim 被拒且差点污染 eval 的实测数据。历史：2026-10-07 修复编辑器格式化造成的空行问题、新增 §5.5。

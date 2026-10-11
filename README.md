@@ -92,12 +92,16 @@ cd backend
 | --- | --- | --- | --- | --- | --- | --- |
 | 纯向量 | **63.75%** | 72.08% | **74.00%** | **63.09%** | 152 ms | 859 ms |
 | 混合（向量 + BM25 + RRF） | 61.25% | 68.75% | 70.86% | 59.82% | 151 ms | 446 ms |
-| 混合 + 重排 | 64.17% | **77.50%** | 67.81% | 59.49% | 765 ms | 985 ms |
+| 混合 + 重排 | 64.17% | **77.50–78.33%** | 67.40–67.81% | 59.29–59.54% | 765 ms | 985 ms |
+
+> 📌 表中**带区间的格子就是连跑 3 次的极差**（`hybrid_rerank` 的 R@10 / MRR / nDCG）；R@5 与另外两行是确定值，所以给单值。
 
 > ⚠️ **`vector` 与 `hybrid` 两行是确定值（同输入必得同结果，中间没有非确定性组件）；只有 `hybrid_rerank` 与所有延迟会抖。**
 > **原因**：远端 bge-reranker 的服务端打分对同一输入并非逐位确定。**同一语料、同一脚本连跑 3 次**的实测极差为
-> R@5 0.00pp、R@10 0.83pp、MRR 0.0041、nDCG@5 0.0025（R@10 在 77.50% / 78.33% / 78.33% 之间跳）。
+> R@5 **0.00pp**、R@10 **0.83pp**、MRR **0.0042**、nDCG@5 **0.0025**（R@10 在 77.50% / 78.33% / 78.33% 之间跳）；
+> 40 条里有 **12 条的 Top10 顺序被改写**（集合基本不变），其中 2 条的指标真的变了。
 > 所以重排那一行请读作 **R@5 64.2% / R@10 77.5–78.3%**，**不要把小数位当精度**。
+> 原始逐查询比对留底：[`docs/evidence/rerank_variance.txt`](./docs/evidence/rerank_variance.txt)，可复现脚本 `backend/scripts/rerank_variance.py`。
 > 延迟更要当心：n=40 时 **P95 基本由单个离群点决定**（`vector` p95 859 ms 就是某一条 956 ms 拉出来的，
 > 它的中位数只有 152 ms）。所以延迟**只用于三组之间的相对比较**，不要当 SLA。
 > 复现时请检查报告的 `provider_stats.degraded_calls`：若不为 0，说明该次跑被降级污染，数字不可比。
@@ -106,9 +110,9 @@ cd backend
 
 ### 结论一：重排只在 Recall@10 上有确定收益
 
-`hybrid_rerank` 相对 `hybrid`：**Recall@10 +8.75pp**（68.75% → 77.50%）。**重排确实把真正相关的菜从池子中后段捞进了前 10。**
+`hybrid_rerank` 相对 `hybrid`：**Recall@10 +8.75 to +9.58pp**（68.75% → 77.50%–78.33%）。**重排确实把真正相关的菜从池子中后段捞进了前 10。**
 
-但要说全：它在 Recall@5（64.17% vs 63.75%，仅 +0.42pp）、MRR@10（67.81% vs 74.00%）、nDCG@5（59.49% vs 63.09%）上**仍然不如纯向量**。所以准确表述是「**重排修好了召回广度，但没有修好头部精度**」。
+但要说全：它在 Recall@5（64.17% vs 63.75%，仅 +0.42pp）、MRR@10（67.4–67.8% vs 74.00%）、nDCG@5（59.3–59.5% vs 63.09%）上**仍然不如纯向量**。所以准确表述是「**重排修好了召回广度，但没有修好头部精度**」，而且 **MRR / nDCG 的落后幅度远大于 R@10 的领先幅度**——它不是一次全面升级。
 
 ### 结论二：等权 RRF 是个结构性缺陷，不是「BM25 有噪声」（**负面结论，也是本次最有价值的发现**）
 
@@ -166,6 +170,7 @@ cd backend
 
 **唯一严格单调的量是「Top10 里双通道共识项占比」：52.0% → 73.3% → 85.3% → 87.3%**——即 BM25 权重越大，头部越被「两路都命中」的菜占满，而向量单独召回的真值越靠后。
 
+
 **但必须诚实说：指标本身并不严格单调。** 例如 R@5 在 `w=0.5`（62.92%）反而略高于 `w=0.25`（62.08%），MRR 在 `w=0.5`（0.6935）反而低于 `w=1.0`（0.7086）。**40 条样本下 1pp 级别的跳动不能当结论**，所以这里只主张两件有把握的事：
 
 1. **没有一个权重能让所有指标都赢过纯向量。** `w=0.0` 拿下 R@5 / MRR / nDCG 三项；`w=0.25` 只在 R@10 上更好（74.17% vs 72.08%，+2.09pp），代价是 R@5 −1.67pp、MRR −2.73pp。
@@ -205,6 +210,18 @@ cd backend
 - 延迟在**本机 + Docker + 公网 SiliconFlow** 上测得，含网络往返；换机器 / 换网关数字会变。
 - ⚠️ **本表数字的"有效期"绑定在语料上**：改解析器 / 改切分 / 换 embedding 模型都会改变卡片文本 → 向量 → 排序。**每次重灌必须重跑 `scripts/build_index` 并全量重跑评估**，流程写在 [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md) §4.6。**本次数字就是重灌后的结果**（重灌前 `hybrid` R@5 是 59.58%，现在是 61.25%——不是回退，是卡片文本变干净了）。
 
+**证据在哪（不只在 gitignore 的 `.tmp/` 里）**：`data/eval/reports/*.json` 是可重建产物、不入库（4 份合计 ~920 KB），所以关键结论都有一份**入库的原始证据 + 可复现脚本**：
+
+| 结论 | 入库证据 | 复现脚本 |
+| --- | --- | --- |
+| 三组指标 / 延迟 / 分场景 | [`docs/evidence/eval_reports_summary.json`](./docs/evidence/eval_reports_summary.json)（含报告 SHA256 前 16 位，可逐字段对账） | `scripts.eval --mode all` + `scripts.summarize_eval_reports` |
+| 重排跑间抖动（R@10 77.50–78.33%） | [`docs/evidence/rerank_variance.txt`](./docs/evidence/rerank_variance.txt) | `scripts.rerank_variance` |
+| 通道归因（双通道 7 / 仅向量 13 / 仅 BM25 0 / 未召回 1） | [`docs/evidence/channel_attribution.txt`](./docs/evidence/channel_attribution.txt) | `scripts.channel_attribution` |
+| 端到端 5 场景（含误报留档） | [`e2e_run2.txt`](./docs/evidence/e2e_run2.txt) / [`e2e_run3.txt`](./docs/evidence/e2e_run3.txt) / [`e2e_run1_OLD_PROBE_field_bug.txt`](./docs/evidence/e2e_run1_OLD_PROBE_field_bug.txt) | `scripts.e2e_probe` |
+| 解析噪声清理前后 | [`import_report.before.json`](./docs/evidence/import_report.before.json) / [`import_report.after.json`](./docs/evidence/import_report.after.json) | `scripts.import_howtocook` |
+
+> 连那次**「探针写死字段名把 5 条候选报成 0 条」的误报输出**也留在仓库里（`e2e_run1_OLD_PROBE_field_bug.txt`）——它比删掉更有价值，因为它记录了"我们差点被自己的脚本骗过"。
+
 指标口径：
 
 - **Recall@k**：标注的相关菜谱里，有多少出现在 Top-k。
@@ -214,19 +231,23 @@ cd backend
 
 ### 端到端接口实测（`POST /recommend`，真机）
 
-**下表为 2026-10-11 数据重灌 + 重建索引后的最新一轮实测**（`.tmp/e2e_after_reload.txt` 留底）：
+**下表是 2026-10-11 数据重灌 + 重建索引后的实测**，延迟为**连跑 3 轮的真实 min–max**（聚合脚本：`backend/scripts/e2e_latency_summary.py`；原始输出：[`e2e_run2.txt`](./docs/evidence/e2e_run2.txt) / [`e2e_run3.txt`](./docs/evidence/e2e_run3.txt) / [`e2e_run4.txt`](./docs/evidence/e2e_run4.txt)；可复现：`backend/scripts/e2e_probe.py`）：
 
-| 场景 | 延迟 | 结果 |
+| 场景 | 延迟（3 轮 min–max，极差） | 结果 |
 | --- | --- | --- |
-| `{"query":"西红柿炒鸡蛋"}` | **10.4 s** | 3 条推荐（西红柿炒鸡蛋 / 西红柿鸡蛋挂面 / 西葫芦炒鸡蛋），`node_path=[parse,search,generate,validate]`，`degraded=false` |
-| `{"query":"20 分钟能搞定的家常菜"}` | **2.0 s** | `recommendations=[]`，`no_solution_reason="no_candidates_under_constraints"`，`node_path=[parse,search,no_solution]` |
-| `{"query":"清淡的汤，不要辣"}` | **9.8 s** | 3 条推荐（金针菇汤 / 生汆丸子汤 / 朱雀汤），`degraded=true`，`degradations=["recommendation_shortfall"]`（LLM 只给了 2 条，第 3 条由候选按检索顺序补齐，**它的 `reason` 是规则模板**：`命中你的需求「…」的混合检索第 3 名结果`） |
-| `POST /recipes/search {"query":"有鸡蛋和番茄","top_k":5}` | **0.35 s** | 5 条候选（番茄牛肉蛋花汤 / 意式香肠北非蛋 / 罗宋汤 / 鸡蛋三明治 / 温泉蛋），`degraded=false` |
-| `{"query":""}` | **6 ms** | 422 + 统一错误信封（`query` 有 `min_length=1`） |
+| `{"query":"西红柿炒鸡蛋"}` | **9.2 – 12.0 s**（极差 2.8 s） | 3 条推荐（西红柿炒鸡蛋 / 西红柿鸡蛋挂面 / 西葫芦炒鸡蛋），`node_path=[parse,search,generate,validate]` |
+| `{"query":"20 分钟能搞定的家常菜"}` | **2.1 – 2.3 s**（极差 0.2 s） | `recommendations=[]`，`no_solution_reason="no_candidates_under_constraints"`，`node_path=[parse,search,no_solution]`（3 轮完全一致） |
+| `{"query":"清淡的汤，不要辣"}` | **7.6 – 9.2 s**（极差 1.6 s） | 3 条推荐（金针菇汤 / 生汆丸子汤 / 朱雀汤），`degraded=true`，`degradations=["recommendation_shortfall"]`（3 轮都触发） |
+| `POST /recipes/search {"query":"有鸡蛋和番茄","top_k":5}` | **0.37 – 0.44 s**（极差 70 ms） | 5 条候选（番茄牛肉蛋花汤 / 意式香肠北非蛋 / 罗宋汤 / 鸡蛋三明治 / 温泉蛋），`degraded=false`（3 轮结果完全一致） |
+| `{"query":""}` | **3 – 18 ms** | 422 + 统一错误信封（`query` 有 `min_length=1`） |
 
-> 上面第 3 行的 `reason` 是个**真实可讲的细节**：它暴露了两条不同的生成路径——LLM 正常返回的 2 条理由是人话，补齐的第 3 条是规则模板。这正是 `degraded=true` 想传达的信息，而不是把它藏起来。
+**延迟为什么给区间而不是一个数**：同一份代码、同一份语料，`西红柿炒鸡蛋` 三轮跑出 9.2 / 12.0 / 11.5 s——**2.8 s 的极差全部来自 LLM 生成阶段**（同一批跑里纯检索三轮只差 70 ms）。给一个三位小数的"精确值"是假精度，所以这里给区间。同理，**`degraded` 也不稳定**：三轮里两轮 `degraded=false`、一轮 `degraded=true` + `recommendation_shortfall`——因为模型有时只返回 2 条推荐，触发补齐。这是**真实存在的非确定性**，不是 bug，也正因如此我们才把 `degraded` / `degradations` 做成响应字段而不是只写日志。
 
-> ⚠️ **延迟 9–12 s 是当前实现最大的工程欠账**：`parse` 与 `generate` 是两次**串行** chat 调用（本次 parse + generate 合计 ≈ 10 s）。这不是检索慢（纯检索 0.35 s），而是 LLM 往返慢 + 串行。压到 3 s 内的做法（并发两次调用、或把 parse 换成规则/小模型）属于产品取舍，**当前没有做**，登记在 [`docs/failed-features.md`](./docs/failed-features.md) F14。
+> 上面「清淡的汤」那行的第 3 条 `reason` 是个**真实可讲的细节**：`命中你的需求「清淡的汤，不要辣」的混合检索第 3 名结果`。它暴露了两条不同的生成路径——LLM 正常返回的理由是人话，补齐的那条是规则模板。这正是 `degraded=true` 想传达的信息，而不是把它藏起来（登记为 `docs/failed-features.md` F19）。
+
+> ⚠️ **延迟 8–12 s 是当前实现最大的工程欠账**：`parse` 与 `generate` 是两次**串行** chat 调用（合计 ≈ 8–11 s）。这不是检索慢（纯检索 0.4 s），而是 LLM 往返慢 + 串行。压到 3 s 内的做法（管道化、或把 parse 换成规则/小模型）属于产品取舍，**当前没有做**，登记在 [`docs/failed-features.md`](./docs/failed-features.md) F14。
+
+> 📌 表里**每一行都带极差**，而不是只有一行带区间——因为读者需要知道**哪些数字可比、哪些不可比**。
 
 ---
 
@@ -480,9 +501,9 @@ pnpm typecheck && pnpm lint && pnpm build
 $ .venv\Scripts\python.exe -m pytest -q -p no:cacheprovider --cov=domain --cov=rag --cov=infra \
     --cov=core --cov=api --cov=agents --cov=services --cov=main --cov-report=term
 TOTAL                              1669     66    96%
-491 passed, 4 skipped in 53.69s
+519 passed, 4 skipped in 53.82s
 $ .venv\Scripts\python.exe -m ruff check .          → All checks passed!
-$ .venv\Scripts\python.exe -m ruff format --check . → 86 files already formatted
+$ .venv\Scripts\python.exe -m ruff format --check . → 92 files already formatted
 ```
 
 覆盖率**最低的三个模块也一并说清，不藏**（补齐前的旧值 → 现在）：

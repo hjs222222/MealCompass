@@ -94,7 +94,7 @@ data/raw/howtocook/
 | 虚词 | `一般`、`左右` | 丢弃 |
 | **反例（必须保留）** | `盐量`、`肉量`、`油量`（`盐量 = 兔肉斤数 * 2 克`） | 「量」结尾不等于说明句，**不能一刀切误杀** |
 
-**清理前后的真实对比**（`.tmp/import_report_before/import_report.json` 留底对照）：
+**清理前后的真实对比**（两份报告都已**入库**，可直接对账：[`docs/evidence/import_report.before.json`](./evidence/import_report.before.json) / [`import_report.after.json`](./evidence/import_report.after.json)）：
 
 | 指标 | 清理前 | 清理后 | 变化 |
 | --- | --- | --- | --- |

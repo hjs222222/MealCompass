@@ -128,5 +128,15 @@
   6 failed, 485 passed, 4 skipped
   ```
 - 原因：`observability.configure()` 的**启用路径会往 `os.environ` 写 `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY`**，而 `Settings(_env_file=None)` 里的 `_env_file=None` **只关掉 `.env` 文件，关不掉真实环境变量**。于是"启用路径"用例先跑之后，后面的"未配 key"用例**从环境变量里捡到了上一个用例留下的 key**，变成已配置状态。这是典型的**用例间顺序依赖**——单跑绿、全量红，比全红更危险。
-- 解决：① 给 `test_infra_observability.py` 加 autouse fixture，在每个用例前后**保存并还原 `LANGFUSE_*` 四个变量**，同时清掉模块级 `_client/_module/_ready/_degraded_reason`；② `enabled` fixture 也负责还原环境变量；③ 构造 `Settings` 时**显式传 `langfuse_public_key=None` / `langfuse_secret_key=None`**（初始化参数优先级最高，压过环境变量）；④ **正反两种文件顺序各跑一遍**确认无顺序依赖。结果：491 passed / 4 skipped，覆盖率 **93% → 96%**（`api/deps.py` 与 `infra/db.py` 到 100%）。**新增规矩**：**任何写 `os.environ` 的模块，其测试必须自带环境变量保存/还原；看见"单文件绿、全量红"先怀疑用例间污染，不要怀疑被测代码。**
+- 解决：① 给 `test_infra_observability.py` 加 autouse fixture，在每个用例前后**保存并还原 `LANGFUSE_*` 四个变量**，同时清掉模块级 `_client/_module/_ready/_degraded_reason`；② `enabled` fixture 也负责还原环境变量；③ 构造 `Settings` 时**显式传 `langfuse_public_key=None` / `langfuse_secret_key=None`**（初始化参数优先级最高，压过环境变量）；④ **正反两种文件顺序各跑一遍**确认无顺序依赖。结果：491 passed / 4 skipped，覆盖率 **93% → 96%**（`api/deps.py` 与 `infra/db.py` 到 100%）。**新增规矩**：**任何写 `os.environ` 的模块，其测试必须自带环境变量保存/还原；看见"单文件绿、全量红"先怀疑用例间污染，不要怀疑被测代码。**（后续 W3.7 又为入库脚本补了 28 项单测，最终 **519 passed / 4 skipped、覆盖率仍 96%**；本条保留当时的 491，因为这是那一刻的真实输出。）
+
+## 2026-10-11 C5 端到端探针写死响应字段名，把 `/recipes/search` 的 5 条候选误报成 0 条
+- 问题：写完覆盖率测试后重跑端到端 5 场景，探针脚本输出 `POST /recipes/search {"query":"有鸡蛋和番茄","top_k":5}` → `HTTP 200 耗时 767 ms`、`results=0`、`top3=[]`。**HTTP 是 200、`degraded=False`，看起来像"检索真的没召回"，差点被当成一条新的失败结论写进 README。**
+- 原因：探针里写死读 `data.get("results")`，而 `/recipes/search` 的真实契约字段是 **`candidates`**（`SearchResponse.candidates`，契约在 `domain/models/recommend.py`）。字段不存在 → `None` → `or []` → 打印 0。**是探针在骗人，不是接口坏了。**
+- 解决：① 把探针改成**按字段是否存在自动适配**（`candidates` / `results` 都认，见 `backend/scripts/e2e_probe.py` 的 `candidates_of`），重跑得到真实的 5 条候选（番茄牛肉蛋花汤 / 意式香肠北非蛋 / 罗宋汤 / 鸡蛋三明治 / 温泉蛋）；② 探针**入库**到 `backend/scripts/e2e_probe.py`，原始输出留底到 `docs/evidence/e2e_run{2,3}.txt`，让 README 的每个数字都能被一条命令复现；③ 把误报那次输出重命名为 `docs/evidence/e2e_run1_OLD_PROBE_field_bug.txt` **一并入库**——留着它是为了证明"我们差点被自己的脚本骗过，以及怎么发现的"。**新增规矩**：**端到端脚本不要写死响应字段；对外的断言字段必须先与 `domain/models/` 的契约对齐；探针的输出必须留底入库，否则无法分辨"接口坏了"和"探针写错了"。**
+
+## 2026-10-11 同一份代码连跑三轮，延迟差出 2.8 s、`degraded` 还会翻转
+- 问题：为给 README 的端到端表提供可复现证据，连跑了 3 轮。同样的 `{"query":"西红柿炒鸡蛋"}`：**12.0 s / 10.4 s / 9.2 s**；`degraded` 两轮 `false`、一轮 `true` + `recommendation_shortfall`（同一句话，模型有时只返回 2 条推荐）。而同一批跑里**无解路径 2.0–2.2 s、纯检索 444/441 ms 三轮几乎不变**。
+- 原因：**波动全部来自 LLM**（生成阶段的输出长度与耗时都不稳定），**检索侧是稳定的**。把 LLM 的不确定性写成 `degraded` 字段、把检索的稳定性写成固定数字，两者不能混。
+- 解决：① README 的端到端表**改成给区间**（`9.2 – 12.0 s`），并明确写"延迟差异全部来自 LLM 生成阶段"——**拒绝给假精度**；② 把"三轮里有一轮 `degraded=true`"作为**真实存在的非确定性**写进表里，而不是挑一轮好看的；③ 原始三轮输出全部入库到 `docs/evidence/`；④ 补 `scripts/e2e_latency_summary.py` **自动聚合区间**，并把"排除已知有 bug 的轮次"写成代码里的常量（`EXCLUDED_MARKERS`）而不是文档里的一句解释。**新增规矩**：**任何含 LLM 往返的指标，默认按"多次运行给区间"来报；一次测量只写一个精确数字，等于在报告里藏了未测量的方差。**
 
