@@ -84,7 +84,12 @@ mealcompass/
 │   ├── scripts/              # 一次性脚本
 │   │   ├── seed_recipes.py   # 导入菜谱
 │   │   ├── build_index.py    # 建向量索引
-│   │   └── eval.py           # 跑评估集
+│   │   ├── eval.py           # 跑评估集
+│   │   ├── e2e_probe.py      # 端到端 5 场景真机复跑（证据入口）
+│   │   ├── e2e_latency_summary.py  # 多轮探针输出 → 区间表
+│   │   ├── summarize_eval_reports.py  # 评估报告 → 可入库摘要（含 SHA256）
+│   │   ├── channel_attribution.py     # RRF 通道归因（只读复算）
+│   │   └── rerank_variance.py         # 重排跑间抖动量化
 │   │
 │   ├── tests/
 │   ├── main.py               # FastAPI 入口
@@ -120,10 +125,14 @@ mealcompass/
 │   └── Dockerfile
 │
 ├── data/
-│   ├── recipes/              # 原始菜谱 JSON
+│   ├── recipes/              # 原始菜谱 JSON（可重建，gitignore）
 │   ├── rules/                # 规则 YAML（可热更新）
 │   ├── ingredients/          # 食材归一化词典（别名 → 标准名，T1.3）
-│   └── eval/                 # 评估集
+│   └── eval/                 # 评估集（queries.yaml 入库；reports/ 可重建，gitignore）
+│
+├── docs/
+│   └── evidence/             # ★ 入库的原始证据（指标摘要/抖动/归因/端到端/清理前后）
+│                             #   正文数字必须能追到这里，见 docs/evidence/README.md
 │
 ├── docker-compose.yml
 └── README.md
@@ -455,6 +464,7 @@ class RerankClient(Protocol):
 | v1.8 | 2026-10-11 | `/dashboard` 文案修正：删掉「页面刻意不展示推荐结果：推荐 Agent…尚未实现」这句已过期的描述，改为指向 `/recommend`，并把「未完成能力统一记录在 `docs/failed-features.md`」保留 | 推荐链路已上线（`/recommend`），旧文案与现状矛盾；文档与界面都不许假装未做的东西可用，也不许假装已做的东西不存在 |
 | v1.9 | 2026-10-11 | 解析层（`scripts/import_howtocook.py`）新增噪声过滤与并列拆分：`_is_section_heading` / `_looks_like_prose` 扩容（用量句、容量句、缩放规则）/ `TOOL_KEYWORDS` 扩 20 项 / 新导出 `parse_ingredient_lines`（`、` `/` `+` 拆分）。**卡片文档的食材输入随之变化**，因此重灌 `seed_recipes` 后**必须重跑 `scripts/build_index`**（本次重建 372 卡片 + 3,806 步骤向量） | 「必备原料和工具」区里混着章节小标题（`工具`/`原料:`）、说明句（`盐的用量为`）、缩放规则（`肉量 = 份数 * 200g`）与工具名，被当成食材后既污染 `unmapped_top` 又拉低归一化率；修在解析层而不是往词表塞垃圾。**代价是卡片文本变了 → embedding 变 → 检索指标变**，已按「留底 → 重灌 → 重建索引 → 校验 40/40 → 全量重跑」流程处理，三组消融结论未变 |
 | v1.10 | 2026-10-11 | 检索评估结论落地到文档：`README.md`「评估结果」四节 + 权重敏感性表全部换成重灌后的实测数字；`docs/INTERVIEW.md` 补 Q4.4b（降级标签精确契约）、Q4.4c（`node_parse` 数组边界）、Q7.4 重写（RRF 结构不等式 + 权重实验）、Q7.5（抖动与 P95 不可信）、Q7.6（63.75% 的差距归因） | 早期 README 写过「Recall@5 ≥ 85%」这个**无测量支撑**的目标值，且「BM25 噪声顶头部」的归因被逐条三元组分析否定；文档必须与实测一致，负面结论也要留档 |
+| v1.11 | 2026-10-11 | **新增证据层 `docs/evidence/`（入库）与 5 个复现脚本**：`scripts/e2e_probe.py`（端到端 5 场景）、`e2e_latency_summary.py`（多轮聚合成区间）、`summarize_eval_reports.py`（评估摘要 + SHA256）、`channel_attribution.py`（RRF 通道归因）、`rerank_variance.py`（重排抖动）。架构上属于**只读的观测/汇总层**：只消费 `data/eval/reports/*.json` 与 HTTP 响应，不改 `rag/`、`agents/` | 正文数字需要一个可对账的落点：`data/eval/reports/` 与 `.tmp/` 都在 gitignore 里，别人 clone 后无法验证任何数字。同时暴露出两类真实事故：探针写死响应字段名（`results` vs 契约 `candidates`）导致把 5 条候选报成 0 条；同一代码三轮延迟差 2.8 s 而给的是单一精确值 |
 
 **迭代规则**：
 
