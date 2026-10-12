@@ -21,7 +21,7 @@
 | 能力 | 状态 | 证据 |
 | --- | --- | --- |
 | 菜谱知识库（372 道 / 3,697 条食材 / 3,806 个步骤） | ✅ 已入库并实测 | `data/recipes/import_report.json` |
-| 双层向量索引（卡片级 + 步骤级，1024 维，HNSW） | ✅ 已建 | 库里 372 + 3,806 条向量 |
+| 双层向量索引（卡片级 + 步骤级，1024 维，HNSW） | ⚠️ **两层都已建；但只有卡片级参与检索** | 库里 372 + 3,806 条向量都真实存在（`count(embedding)` 可查）；**`retriever.py` 只读卡片层**，步骤层未接入，见 F21 |
 | 混合检索（向量 Top50 + BM25 Top50 → RRF → 重排） | ✅ 已实现并实测 | `backend/rag/retriever.py`、`scripts/smoke_retrieval.py` |
 | 硬约束**下推**到检索层（忌口 / 时间 / 厨具） | ✅ 已实现（SQL 层） | `backend/rag/retriever.py`、`tests/unit/test_retriever_filters.py` |
 | 引用校验（拒绝 LLM 编造 `recipe_id`） | ✅ 已实现并接入 | `backend/domain/citations.py` |
@@ -61,7 +61,7 @@ MealCompass 面向**所有做饭的普通人**：不只是一个"今天吃什么
 
 | 模块 | 功能 | 状态 |
 | --- | --- | --- |
-| 知识库与 RAG | 372 道结构化菜谱、双层索引、混合检索、重排、引用防幻觉 | ✅ 已实现并实测 |
+| 知识库与 RAG | 372 道结构化菜谱、双层索引（**步骤层未接入检索，见 F21**）、混合检索、重排、引用防幻觉 | ✅ 已实现并实测（步骤层除外） |
 | Agent 推荐 | 最小闭环（查询理解 → 检索 → 生成 → 引用校验）、无解显式返回 | ✅ 已实现并实测 |
 | 约束引擎 | 忌口 / 时间 / 厨具**硬过滤下推到检索层** | ✅ 已实现（SQL 层） |
 | 约束引擎 | 口味软偏好、YAML 规则热更新 | 🚧 开发中 |
@@ -86,7 +86,7 @@ cd backend
 .venv\Scripts\python.exe -m scripts.eval --mode all
 ```
 
-**实测环境**：本机 Docker Postgres 16 + pgvector（372 道菜、372 卡片向量、3,806 步骤向量）+ SiliconFlow `BAAI/bge-m3` / `BAAI/bge-reranker-v2-m3`（`provider_stats` 中 `degraded_calls = 0`，即**全部走远端、无降级污染**）。三组统一取 **Top50 候选池**，指标只在前 5 / 前 10 上截断。
+**实测环境**：本机 Docker Postgres 16 + pgvector（372 道菜、372 卡片向量、3,806 步骤向量）+ SiliconFlow `BAAI/bge-m3` / `BAAI/bge-reranker-v2-m3`（`provider_stats` 中 `degraded_calls = 0`，即**全部走远端、无降级污染**）。三组统一取 **Top50 候选池**，指标只在前 5 / 前 10 上截断。**⚠️ 但下表的排序完全由卡片级单层召回决定**——3,806 条步骤向量虽已建好，检索路径不读它（F21）。
 
 | 模式 | Recall@5 | Recall@10 | MRR@10 | nDCG@5 | 延迟中位数 | P95 |
 | --- | --- | --- | --- | --- | --- | --- |
