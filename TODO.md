@@ -44,6 +44,7 @@
 - [X] **W3.11 推荐卡片 UI 打磨（2026-10-12）**：`recipe_id` 从卡片主视觉层移入 `<details>` 披露入口（可展开复制，剪贴板不可用时退化为手动选中）；新增 `docs/UI_STYLE.md`「技术性标识必须折叠」约定
 - [X] **W3.12 完整菜谱卡片（2026-10-12）**：推荐响应补充原文明示时长、难度、热量、原料份量、工具、步骤、附加说明、来源和真实图片；图片受限静态端点仅允许读取菜谱图片；卡片详情折叠展示，无图/读取失败有明确状态。时长审计 372 道：367 条保守提取，5 条留待人工确认；未做模型估算、未重灌数据库。
 - [X] **W3.13 一键启动脚本（2026-10-12）**：`start_mealcompass.bat` + `scripts/start_mealcompass.ps1`，双击即自检环境、起前后端、就绪后打印可点击网址；子命令 `check` / `status` / `stop` / `open` / `reload`。自检覆盖依赖、端口占用（打印占用进程）、数据库 TCP 可达（连不上尝试 `docker compose up -d postgres`）、上次残留进程；日志被占时自动换时间戳文件名；`next dev` 的 `spawn EPERM` 自动降级为生产模式；后端 `--reload` 改为 opt-in（具名管道受限环境会失败）。实测：pwsh 7.6 与 PowerShell 5.1 下 `check` 均 exit 0，真实启动 4 个网址全 HTTP 200，`stop` 后端口释放。
+- [X] **W3.14 演示前体验修复（2026-10-12）**：① 修复"不要南瓜"却推荐山药南瓜炖鸡汤——根因是食材词表缺"南瓜"+别名（小南瓜≠南瓜），补 aliases.yaml 并 DB 回填 ingredient_id；② HardFilters/RecommendRequest 加 `category` 字段并 SQL 下推，前端加 8 个中文分类快捷按钮；③ 删厨具选择 UI 与"所需工具"区块（上游 tools 恒为空，类型保留）；④ 删"按烹饪时长筛选（暂不可用）"占位块；⑤ 卡片 reason 不再暴露"混合检索第 N 名"系统术语，GENERATE prompt 改为"必须恰好 N 条"减少 shortfall；⑥ 热量标签去掉"（HowToCook 预估）"后缀；⑦ logging.py 加 RotatingFileHandler（5MB×3）；⑧ DEGRADATION_LABELS 补 recommendation_shortfall 中文释义。后端 580 passed、前端 typecheck/lint/build 全绿。
 
 **明确不做（三周内）**：注册登录、购物清单、一周菜单、烹饪指导模式、语音、长期记忆、多智能体、A/B 实验、付费。
 

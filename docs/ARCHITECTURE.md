@@ -474,6 +474,8 @@ class RerankClient(Protocol):
 
 | v1.13 | 2026-10-12 | 新增 RecipeStepsReader / SqlRecipeStepsReader，推荐校验后回填原文步骤；Recommendation.steps 默认空列表，前端查看做法 | 数据库步骤已入库但推荐契约未输出，用户无法查看做法 |
 
+| v1.14 | 2026-10-12 | HardFilters / RecommendRequest / SearchRequest 新增 `category: str | None` 字段并 SQL 下推到 `recipes.category`（已有 `ix_recipes_category` 索引）；`core/logging.py` 加 `RotatingFileHandler`（5MB×3，写 `.tmp/logs/mealcompass.log`）；食材词表补「南瓜」标准食材 + [小南瓜/金瓜/倭瓜/番瓜/南瓜块/南瓜泥] 别名，修复"不要南瓜"仍推荐山药南瓜炖鸡汤的硬约束漏过滤 | ① `recipes.category` 列早已存在但检索层没接，前端无法按分类筛；② 日志只有 stderr 被启动脚本重定向到固定文件，无轮转；③ 食材写法差异（小南瓜≠南瓜）+ 词表缺条目导致忌口硬约束漏菜，这是 demo 级信任事故 |
+
 **迭代规则**：
 
 1. 每次架构变更必须在此表登记
