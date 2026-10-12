@@ -160,3 +160,17 @@
 - 原因：`scripts/seed_recipes.py:223` 用「先删后插」保证幂等——`delete(recipe_steps)` 会**连同 embedding 一起删掉**，而重插的行只含 `{recipe_id, step_no, content}`（不含 embedding）。所以**每次重灌菜谱，步骤层向量都会被清空**；而 §4.6 的证据链纪律只强调"重灌后要重跑 `build_index`"，没有强调"`seed_recipes` 会破坏步骤层"。10-11 那次重灌后确实重跑过 `build_index`（`.tmp` 里有 `pwsh-76` 的 `--layer step` 作业记录，exit 0），但**之后又跑过一次 `seed_recipes`**（`recipes.created_at` 最新为 `2026-10-07 05:18`，而卡片层 embedding 非空 → 说明卡片层是在 seed 之后单独重建的，步骤层则被 seed 清掉后**没再补**）。**"跑过重建"不等于"当前数据库里还有向量"**——这是一次典型的"把执行记录当成当前状态"。
 - 解决：① **先补数据**：`python -m scripts.build_index --layer step --batch-size 8`（默认 `--batch-size 64` 会撞 SiliconFlow 读超时 `httpx.ReadTimeout`，33 s 后失败；降到 8 后 364.9 s 跑完 3,806 条）→ 复核 `step_vectors = 3806 / null = 0 / vector_dims = 1024`。② **修正文档口径**：核实后发现这一层**根本没接入检索**（`retriever.py`/`agents/`/`services/` 对 `recipe_steps` 的引用数全为 0），所以真正该写的不是"已建"而是"**两层都建了，但只有卡片级参与检索**"——已同步修正 README L24 / L64 / L89 与 `rag/chunking.py` 模块注释，并登记为 `docs/failed-features.md` **F21**。③ **新增两条规矩**：**「跑过重建」≠「当前库里还有向量」——报状态前必须查一次数据库，不能引用执行记录**；**「建了索引」≠「索引在用」——README 写技术能力前，必须确认有生产代码真的读它（`grep` 引用数）**。
 
+## 2026-10-12 W3.12 把结构化空值误判为上游缺失
+- 问题：数据库 `recipes.time_minutes` 全为 NULL，之前据此宣称 HowToCook 没有时长；实际鳊鱼炖豆腐原文明确写「从备料到完成约需 40 分钟」。
+- 原因：导入解析器把 `time_minutes` 固定写成 `None`，推荐生成/校验又沿用了全空假设；description 虽保留原文，却未提取结构化展示值。
+- 解决：新增原文明示总时长提取与全量审计（372 道，367 条保守提取，5 条留待人工确认），详情读取时展示原文文本；不做模型估算、不把单步时间冒充总时长。另补齐详情、步骤、原料、图片和安全图片端点。
+
+## 2026-10-12 W3.12 多智能体中断后的恢复
+- 问题：前端与时长审计子任务曾中断，工作区留下部分未联调改动。
+- 原因：共享任务板状态与工作区改动需要由 Lead 重新核对，不能只依赖中断前的汇报。
+- 解决：按任务板确认两个任务均 completed，Lead 独立运行 580 passed / 4 skipped、Ruff 和真实数据库详情读取，完成剩余集成。
+
+## 2026-10-12 工程：docs/mistakes.md 被误删到只剩 2 条，从 HEAD 恢复
+- 问题：docs/mistakes.md 被误操作清空，工作区只剩 W3.12 两条新记录，31 条历史（模板 + T1.6 起 29 条）整体消失；git diff 显示 160 行删除。
+- 原因：误删发生在未提交的工作区（W3.12 两条尚未入库），文件也没有编辑器本地历史 / 备份副本可回滚（VSCode History 里查无此文件）。
+- 解决：以 HEAD:docs/mistakes.md 为基线恢复（29 条历史一字未改），再把误删时残留的两条 W3.12 记录逐字追加回文末；核对 git diff --numstat 为 9 0（纯新增、零删除），并留底当前稿于 .tmp/mistakes-recovery/。**新增规矩**：docs/mistakes.md 属于"只增不删"的资产，任何"清空 / 重写"操作前先 git show HEAD:docs/mistakes.md 留底。
