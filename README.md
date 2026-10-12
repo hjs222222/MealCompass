@@ -451,6 +451,41 @@ pnpm dev
 
 遇到 `OPTIONS /recommend 405` 或状态接口显示 `network_error, status=0` 时，检查跨域配置并重启后端；仅在终端访问 `/health` 成功不能证明浏览器可跨域读取。Windows 下若 Docker 报 `dockerDesktopLinuxEngine ... The system cannot find the file specified`，先启动 Docker Desktop 并等待 Linux 引擎就绪，再执行 `docker compose up -d`；用 `docker compose ps` 确认 postgres / redis 为 `healthy`。`/health` 仅报告应用进程状态，不代表数据库已就绪。
 
+### 一键启动（Windows，日常最省事）
+
+不想每次手敲两条命令，直接双击仓库根目录的 **`start_mealcompass.bat`**：它会自检环境 → 起后端 + 前端 → 等两个服务真正就绪 → 在终端打印下面这些可直接点击的网址。
+
+```
+  推荐页面   http://localhost:3000/recommend
+  首页       http://localhost:3000
+  后端 API   http://localhost:8000/docs
+  健康检查   http://localhost:8000/health
+```
+
+命令行里也可以带子命令：
+
+| 命令 | 作用 |
+| --- | --- |
+| `start_mealcompass.bat` | 启动前后端并打印网址（默认） |
+| `start_mealcompass.bat check` | 只做自检，不启动任何服务 |
+| `start_mealcompass.bat status` | 看两个端口与本脚本启动记录的状态 |
+| `start_mealcompass.bat stop` | 停止上一次由它启动的服务 |
+| `start_mealcompass.bat open` | 启动并自动打开浏览器 |
+| `start_mealcompass.bat reload` | 启动并开启后端热重载（默认关闭，见下） |
+
+**它会自动排查的常见问题**（每条都会打印「可能原因与修复建议」，并把日志尾巴贴出来）：
+
+- 缺后端虚拟环境 / 缺依赖 / 缺 `frontend/node_modules` / 没装 Node 或 pnpm；
+- 端口被别的程序占用（打印占用进程，提示换端口或 `stop`）；
+- 数据库连不上（用 TCP 直连判定，连不上会尝试 `docker compose up -d postgres`）；
+- 上一次启动的残留进程（自动清理；清理不掉就保留 `pids.json` 下次再试）；
+- 日志文件被上一次的进程占着（自动改用带时间戳的日志名，不会因此启动失败）；
+- 起不来时按关键字匹配日志并给出修复建议（端口占用 / 缺依赖 / 数据库 / 具名管道被拒 / 配置格式等）。
+
+日志写在 `.tmp\launch\`。停止服务：窗口里按 `Ctrl+C`、直接关闭窗口，或 `start_mealcompass.bat stop`。
+
+**关于热重载**：后端 `--reload` 依赖 multiprocessing 具名管道，在受限环境（沙箱 / 部分安全软件）会被直接拒绝、反而起不来，所以**默认关闭**；需要热重载时用 `start_mealcompass.bat reload`。前端 `next dev` 自己就带热重载；若该环境连 `next dev` 的 fork 都拒绝（`spawn EPERM`），脚本会自动降级为 `pnpm build` + `next start` 生产模式，功能一致、只是没有热重载。
+
 ### 跑评估（三组消融）
 
 ```bash

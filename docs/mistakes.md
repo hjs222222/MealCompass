@@ -174,3 +174,17 @@
 - 问题：docs/mistakes.md 被误操作清空，工作区只剩 W3.12 两条新记录，31 条历史（模板 + T1.6 起 29 条）整体消失；git diff 显示 160 行删除。
 - 原因：误删发生在未提交的工作区（W3.12 两条尚未入库），文件也没有编辑器本地历史 / 备份副本可回滚（VSCode History 里查无此文件）。
 - 解决：以 HEAD:docs/mistakes.md 为基线恢复（29 条历史一字未改），再把误删时残留的两条 W3.12 记录逐字追加回文末；核对 git diff --numstat 为 9 0（纯新增、零删除），并留底当前稿于 .tmp/mistakes-recovery/。**新增规矩**：docs/mistakes.md 属于"只增不删"的资产，任何"清空 / 重写"操作前先 git show HEAD:docs/mistakes.md 留底。
+
+## 2026-10-12 W3.13 一键启动脚本：连踩 5 个只靠"看代码"发现不了的坑
+- 问题：写 `start_mealcompass.bat`（双击起前后端并打印网址）时，最省事的两条命令（`uvicorn --reload`、`next dev`）在受限环境里**根本起不来**；把日志重定向到固定文件、用 `taskkill /T` 停服务，也各有各的坑，逐个实测才暴露。
+- 原因（5 个坑，都实测过）：
+  1. `next dev` 必定 `fork` 一个带 IPC 具名管道的子进程（`next-dev.js:213`），沙箱 / 安全软件直接 `spawn EPERM`，且**没有配置开关**；`next start` 同进程启动，不受影响。
+  2. `uvicorn --reload` 的 reloader 走 multiprocessing 具名管道，同样 `PermissionError [WinError 5]`，报一屏 `resource_sharer` traceback。
+  3. 本机 pwsh 7.6 下 `Start-Process -PassThru -NoNewWindow` 返回的 Process **`ExitCode` 恒为空**（实测 `cmd /c exit 7` 读回空），会让"构建是否成功"这类判断静默失效；`-WindowStyle Hidden` 与 .NET `ProcessStartInfo` 才拿得到 7。
+  4. 日志写死成 `backend.out.log` 时，**上一次没退干净的进程一直占着这个文件**，`cmd` 的 `>` 重定向失败、命令以 1 立即退出——表现成"新启动的后端秒退"，很容易误判成代码坏了。
+  5. `taskkill /PID <cmd包装进程> /T /F` 未必带走真正占端口的 `node`；而且旧版脚本**不看 taskkill 结果就报"已停止"**，还顺手删掉了 `pids.json`，残留进程就此失联。
+- 解决：① 前端 dev 失败且命中 `spawn EPERM` → 自动降级 `pnpm build` + `next start`（已有 `.next` 就跳过构建）；② 后端热重载改成**opt-in**（`start_mealcompass.bat reload`），默认不带 `--reload`；③ 统一改用 .NET `ProcessStartInfo`（`UseShellExecute=false`，保留控制台继承）拿 `ExitCode`；④ 启动前试探日志文件能否独占写入，写不了就换带时间戳的文件名，绝不因日志被占而启动失败；⑤ `pids.json` 同时记录**端口所有者进程**与 cmd 包装进程，`stop` 先杀服务再杀包装进程，并**校验 taskkill 结果**——杀不掉就打印可粘贴的 `taskkill /PID x /T /F` 并把记录留下次重试，不再谎报成功。验证：`check` 在 pwsh 7.6 与 Windows PowerShell 5.1 下均 exit 0；真实启动后 4 个网址全部 HTTP 200（推荐页 20,173 字节）；`stop` 后端口确实释放。
+- 面试可能会问的点：
+  - 「你怎么保证这个脚本不是"能跑就行"？」→ 答：所有关键分支都跑过真实进程来验证，而不是读代码猜；第 3 条（`ExitCode` 恒空）就是"看起来对、实际静默失效"的典型，是实测才抓到的。
+  - 「为什么不直接 `next dev`？」→ 答：先尝试 dev（保留热重载这个开发体验），失败且错误特征明确时才降级到生产模式，并且明确告知用户"已降级、无热重载"，不做静默妥协。
+  - 「为什么 kill 进程这么麻烦？」→ 答：Windows 上占端口的是子进程而不是包装进程，所以按**端口所有者**记录 PID；并且任何 kill 都要检查返回码，"报成功"与"真停掉"是两件事。
