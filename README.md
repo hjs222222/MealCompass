@@ -447,6 +447,10 @@ pnpm dev
 
 访问 http://localhost:3000 ，推荐页在 `/recommend`。
 
+后端默认允许 `http://localhost:3000` 与 `http://127.0.0.1:3000` 跨域访问。若前端换了端口或域名，在根环境配置中设置 `CORS_ALLOW_ORIGINS` 为 JSON 数组（例如 `CORS_ALLOW_ORIGINS=["http://localhost:3001"]`），重启后端后生效。这里填的是**浏览器前端地址**，`NEXT_PUBLIC_API_BASE_URL` 填的是**后端地址**。
+
+遇到 `OPTIONS /recommend 405` 或状态接口显示 `network_error, status=0` 时，检查跨域配置并重启后端；仅在终端访问 `/health` 成功不能证明浏览器可跨域读取。Windows 下若 Docker 报 `dockerDesktopLinuxEngine ... The system cannot find the file specified`，先启动 Docker Desktop 并等待 Linux 引擎就绪，再执行 `docker compose up -d`；用 `docker compose ps` 确认 postgres / redis 为 `healthy`。`/health` 仅报告应用进程状态，不代表数据库已就绪。
+
 ### 跑评估（三组消融）
 
 ```bash

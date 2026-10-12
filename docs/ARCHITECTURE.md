@@ -156,6 +156,8 @@ api → services → domain
 - `infra` 可被上层依赖，但不反向依赖
 - `api` 只调 `services`，不直接调 `infra`
 
+**浏览器跨域边界（W3.10）**：`main.create_app` 装配 FastAPI 自带的 `CORSMiddleware`，来源由 `core.config.Settings.cors_allow_origins` 统一读取（环境变量 `CORS_ALLOW_ORIGINS`，JSON 数组）。默认允许 localhost / 127.0.0.1 的 3000 端口；允许 GET / POST / OPTIONS、JSON 与 request-id 请求头，暴露 `X-Request-ID`，不启用跨域凭证。CORS 在 request-id 中间件外层，确保该中间件生成的安全 500 响应仍可被浏览器读取。
+
 ## 二、核心模块（有哪些模块）
 
 | 模块                    | 职责                  | 对外接口                  | 依赖                          |
@@ -465,6 +467,8 @@ class RerankClient(Protocol):
 | v1.9 | 2026-10-11 | 解析层（`scripts/import_howtocook.py`）新增噪声过滤与并列拆分：`_is_section_heading` / `_looks_like_prose` 扩容（用量句、容量句、缩放规则）/ `TOOL_KEYWORDS` 扩 20 项 / 新导出 `parse_ingredient_lines`（`、` `/` `+` 拆分）。**卡片文档的食材输入随之变化**，因此重灌 `seed_recipes` 后**必须重跑 `scripts/build_index`**（本次重建 372 卡片 + 3,806 步骤向量） | 「必备原料和工具」区里混着章节小标题（`工具`/`原料:`）、说明句（`盐的用量为`）、缩放规则（`肉量 = 份数 * 200g`）与工具名，被当成食材后既污染 `unmapped_top` 又拉低归一化率；修在解析层而不是往词表塞垃圾。**代价是卡片文本变了 → embedding 变 → 检索指标变**，已按「留底 → 重灌 → 重建索引 → 校验 40/40 → 全量重跑」流程处理，三组消融结论未变 |
 | v1.10 | 2026-10-11 | 检索评估结论落地到文档：`README.md`「评估结果」四节 + 权重敏感性表全部换成重灌后的实测数字；`docs/INTERVIEW.md` 补 Q4.4b（降级标签精确契约）、Q4.4c（`node_parse` 数组边界）、Q7.4 重写（RRF 结构不等式 + 权重实验）、Q7.5（抖动与 P95 不可信）、Q7.6（63.75% 的差距归因） | 早期 README 写过「Recall@5 ≥ 85%」这个**无测量支撑**的目标值，且「BM25 噪声顶头部」的归因被逐条三元组分析否定；文档必须与实测一致，负面结论也要留档 |
 | v1.11 | 2026-10-11 | **新增证据层 `docs/evidence/`（入库）与 5 个复现脚本**：`scripts/e2e_probe.py`（端到端 5 场景）、`e2e_latency_summary.py`（多轮聚合成区间）、`summarize_eval_reports.py`（评估摘要 + SHA256）、`channel_attribution.py`（RRF 通道归因）、`rerank_variance.py`（重排抖动）。架构上属于**只读的观测/汇总层**：只消费 `data/eval/reports/*.json` 与 HTTP 响应，不改 `rag/`、`agents/` | 正文数字需要一个可对账的落点：`data/eval/reports/` 与 `.tmp/` 都在 gitignore 里，别人 clone 后无法验证任何数字。同时暴露出两类真实事故：探针写死响应字段名（`results` vs 契约 `candidates`）导致把 5 条候选报成 0 条；同一代码三轮延迟差 2.8 s 而给的是单一精确值 |
+
+| v1.12 | 2026-10-12 | FastAPI 入口装配 CORS 中间件；`Settings.cors_allow_origins` / `CORS_ALLOW_ORIGINS` 配置浏览器来源白名单；错误响应保留跨域头 | 浏览器 JSON POST 预检 405，状态接口虽返回 200 但无跨域头，造成 network_error |
 
 **迭代规则**：
 
