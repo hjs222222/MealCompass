@@ -152,11 +152,17 @@ class HybridRetriever:
         for excluded in filters.excluded_ingredients:
             # Match PostgreSQL lower(column) semantics; casefold can transform characters (e.g. ẞ -> ss)
             # that lower() preserves differently, producing a false negative in the SQL predicate.
+            #
+            # 用 LIKE '%x%' 包含匹配而非精确等值：食材写法千变万化（番茄酱/番茄膏/小南瓜/猪五花肉），
+            # 用户说"不要番茄"时，名称里包含"番茄"的都算番茄（衍生产物/部位同理）。
+            # LIKE 通配符 % 和 _ 需要转义，避免用户输入被当通配符。
             normalized = excluded.lower()
+            escaped = normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
             match = sa.or_(
-                sa.func.lower(ingredients.c.name) == normalized,
-                sa.func.lower(recipe_ingredients.c.name_raw) == normalized,
-                sa.func.lower(ingredient_aliases.c.alias) == normalized,
+                sa.func.lower(ingredients.c.name).like(pattern),
+                sa.func.lower(recipe_ingredients.c.name_raw).like(pattern),
+                sa.func.lower(ingredient_aliases.c.alias).like(pattern),
             )
             exists = (
                 sa.select(1)

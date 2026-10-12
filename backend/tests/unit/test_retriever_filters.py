@@ -73,7 +73,8 @@ def test_hard_filter_sql_compiles_time_tools_and_case_insensitive_ingredients() 
     assert "lower(recipe_ingredients.name_raw)" in sql
     assert "lower(ingredient_aliases.alias)" in sql
     assert "not (exists" in sql
-    assert "虾" in compiled.params.values()
+    # LIKE 包含匹配：参数带 % 通配符
+    assert "%虾%" in compiled.params.values()
 
 
 def test_excluded_ingredient_normalization_matches_sql_lower_semantics() -> None:
@@ -82,7 +83,8 @@ def test_excluded_ingredient_normalization_matches_sql_lower_semantics() -> None
 
     compiled = statement.compile(dialect=postgresql.dialect())
 
-    assert "abc" in compiled.params.values()
+    # LIKE 包含匹配：参数是 %abc% 形式
+    assert "%abc%" in compiled.params.values()
 
 
 def test_empty_hard_filters_do_not_add_sql_predicates() -> None:
