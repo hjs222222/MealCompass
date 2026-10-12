@@ -144,6 +144,8 @@ class HybridRetriever:
                     recipes.c.time_minutes <= filters.max_time_minutes,
                 ]
             )
+        if filters.category:
+            conditions.append(recipes.c.category == filters.category)
         if filters.tools_available:
             available = sa.cast(filters.tools_available, JSONB)
             conditions.append(recipes.c.tools.op("<@")(available))

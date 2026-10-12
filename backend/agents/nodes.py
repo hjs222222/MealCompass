@@ -68,10 +68,12 @@ GENERATE_SYSTEM_PROMPT = """\
 {"recommendations": [{"recipe_id": "...", "reason": "...",
                       "missing_ingredients": [...], "substitutions": [...]}]}
 - recipe_id 必须原样复制候选里的 id，不得改动、不得编造。
-- reason 用一句中文说明为什么这道菜匹配用户需求，必须引用用户的具体约束（时间 / 厨具 / 忌口 / 食材）。
+- reason 用一句简短的中文（不超过 30 字）说明这道菜的亮点或为什么适合用户；
+  不要复述用户的原话（例如不要写"用户想吃X，这道菜以Y为主要食材"），
+  不要提"混合检索""第N名""候选"这类系统内部术语。
 - missing_ingredients 列出用户还需自备的食材（用户未声明的都算缺料）；无法判断就留空数组。
 - substitutions 给出 1-2 条替代建议；没有就留空数组。
-- 最多输出 3 条，按推荐优先级排序。只输出 JSON，不要解释。"""
+- 必须输出 user 消息里指定的条数，一条都不能少；只输出 JSON，不要解释。"""
 
 
 def _merge_usage(current: dict[str, int] | None, added: dict[str, int] | None) -> dict[str, int]:
@@ -238,11 +240,18 @@ def _constraints_block(filters: HardFilters | None) -> str:
 
 
 def _rule_recommendation(candidate: RecipeCandidate, query: str) -> Recommendation:
-    """规则兜底：只用候选自身的真实数据拼一条可展示推荐（不编造 id、不编造耗时）。"""
-    rank = candidate.rank or 0
-    position = f"混合检索第 {rank} 名" if rank else "混合检索命中"
-    reason = f"命中你的需求「{query}」的{position}结果"
-    return Recommendation(recipe_id=candidate.recipe_id, name=candidate.name, reason=reason, time_minutes=None)
+    """规则兜底：只用候选自身的真实数据拼一条可展示推荐（不编造 id、不编造耗时）。
+
+    reason 不暴露"混合检索第 N 名"这类系统内部术语，也不复述用户原 query；
+    LLM 不可用或输出不足时，这是用户直接看到的文案，必须像人话。
+    """
+    del query  # 不再把用户原话塞进 reason，避免"命中你的需求「xxx」的第 N 名"这种机械感
+    return Recommendation(
+        recipe_id=candidate.recipe_id,
+        name=candidate.name,
+        reason="根据你的需求检索到这道菜",
+        time_minutes=None,
+    )
 
 
 def _rule_recommendations(candidates: list[RecipeCandidate], count: int, query: str) -> list[Recommendation]:
@@ -306,7 +315,8 @@ async def node_generate(state: AgentState, deps: AgentDeps) -> dict:
                 "content": (
                     f"用户需求：{query}\n"
                     f"硬约束：{_constraints_block(state.get('filters'))}\n"
-                    f"候选菜谱（只能从中挑选，最多 {expected} 条）：\n{_candidate_prompt_block(candidates)}"
+                    f"候选菜谱（只能从中挑选）：\n{_candidate_prompt_block(candidates)}\n"
+                    f"必须输出恰好 {expected} 条推荐，按推荐优先级排序，一条都不能少。"
                 ),
             },
         ]

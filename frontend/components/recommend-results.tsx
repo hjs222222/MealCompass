@@ -24,6 +24,7 @@ const DEGRADATION_LABELS: Record<string, string> = {
   retrieval_failed: "检索通道失败",
   retrieval_degraded: "检索走了降级路径",
   llm_unavailable: "LLM 不可用",
+  recommendation_shortfall: "模型给出的条数不足，已用剩余候选补齐到你要的数量",
 };
 
 /** Agent 节点名 → 人话。 */
@@ -268,10 +269,8 @@ function RecipeDetailsContent({ item }: { item: Recommendation }) {
             </ul>
           ) : <p className="mt-2 text-stone-600">暂无原料清单。</p>}
         </section>
-        <section>
-          <h4 className="font-serif text-base text-stone-800">所需工具</h4>
-          <p className="mt-1 break-words">{details.tools.length > 0 ? details.tools.join("、") : "原文未注明工具。"}</p>
-        </section>
+          {/* 厨具字段在 RecipeDetails 类型里保留（后端契约不变），但 HowToCook 上游
+              数据不含 tools（import 后恒为 []），因此前端不再渲染"所需工具"区块。 */}
         <section>
           <h4 className="font-serif text-base text-stone-800">做法步骤</h4>
           {details.steps.length > 0 ? (
@@ -308,7 +307,6 @@ function RecommendationCard({ item }: { item: Recommendation }) {
         <span className={TAG_CLASS}>难度：{item.details?.difficulty != null ? `${item.details.difficulty}/5` : "未知"}</span>
         <span className={TAG_CLASS}>
           热量：{item.details?.calories_kcal != null ? `${item.details.calories_kcal} 大卡` : "未知"}
-          {item.details?.calories_source ? `（${item.details.calories_source}）` : ""}
         </span>
       </div>
       <RecipeDetailsContent item={item} />

@@ -15,14 +15,22 @@ class HardFilters(BaseModel):
       ``time_minutes`` 非 NULL 且不超过上限；未知耗时按严格安全语义排除，绝不编造上游耗时。
     - ``tools_available``：用户**拥有**的厨具；菜谱 ``tools`` 必须是它的子集。
     - ``excluded_ingredients``：忌口/过敏食材（标准名或别名都行，检索层负责同义展开）。
+    - ``category``：菜谱一级分类（如 ``soup`` / ``staple``），对应 ``recipes.category`` 列；
+      None 表示不限分类。
     """
 
     max_time_minutes: int | None = Field(default=None, ge=0)
     tools_available: list[str] = Field(default_factory=list)
     excluded_ingredients: list[str] = Field(default_factory=list)
+    category: str | None = None
 
     def is_empty(self) -> bool:
-        return self.max_time_minutes is None and not self.tools_available and not self.excluded_ingredients
+        return (
+            self.max_time_minutes is None
+            and not self.tools_available
+            and not self.excluded_ingredients
+            and self.category is None
+        )
 
 
 class RecipeCandidate(BaseModel):

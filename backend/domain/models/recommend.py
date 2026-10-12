@@ -29,6 +29,10 @@ class RecommendRequest(BaseModel):
     excluded_ingredients: list[str] = Field(
         default_factory=list, description="忌口 / 过敏食材（标准名或别名均可，检索层负责同义展开）"
     )
+    category: str | None = Field(
+        default=None,
+        description="菜谱一级分类（如 soup/staple/meat_dish）；None 表示不限。对应 recipes.category 列。",
+    )
     top_k: int = Field(default=3, ge=1, le=5, description="最终推荐条数；推荐场景上限 5，避免一次塞太多选择")
 
 
@@ -43,6 +47,7 @@ class SearchRequest(BaseModel):
         default_factory=list, description="用户拥有的厨具名；菜谱 `tools` 必须是它的子集"
     )
     excluded_ingredients: list[str] = Field(default_factory=list, description="忌口 / 过敏食材（标准名或别名均可）")
+    category: str | None = Field(default=None, description="菜谱一级分类；None 表示不限")
     top_k: int = Field(default=10, ge=1, le=50, description="返回候选条数；检索场景可放宽到 50，便于人工核对召回")
 
 

@@ -85,6 +85,7 @@ export type RecommendRequest = {
   max_time_minutes?: number | null;
   tools_available?: string[];
   excluded_ingredients?: string[];
+  category?: string | null;
   top_k?: number;
 };
 
@@ -106,6 +107,7 @@ export type SearchRequest = {
   max_time_minutes?: number | null;
   tools_available?: string[];
   excluded_ingredients?: string[];
+  category?: string | null;
   top_k?: number;
 };
 

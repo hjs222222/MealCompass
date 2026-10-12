@@ -41,12 +41,14 @@ def _filters_from(
     max_time_minutes: int | None,
     tools_available: Sequence[str],
     excluded_ingredients: Sequence[str],
+    category: str | None = None,
 ) -> HardFilters:
     """请求字段 → 硬约束模型（硬约束只由规则决定，LLM 不参与判定）。"""
     return HardFilters(
         max_time_minutes=max_time_minutes,
         tools_available=list(tools_available),
         excluded_ingredients=list(excluded_ingredients),
+        category=category,
     )
 
 
@@ -88,6 +90,7 @@ class RecommendService:
             max_time_minutes=request.max_time_minutes,
             tools_available=request.tools_available,
             excluded_ingredients=request.excluded_ingredients,
+            category=request.category,
         )
         deps = AgentDeps(retriever=self._retriever, llm=self._llm, settings=self._settings)
 
@@ -164,6 +167,7 @@ class RecommendService:
             max_time_minutes=request.max_time_minutes,
             tools_available=request.tools_available,
             excluded_ingredients=request.excluded_ingredients,
+            category=request.category,
         )
         degradations: list[str] = []
 

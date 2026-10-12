@@ -188,3 +188,20 @@
   - 「你怎么保证这个脚本不是"能跑就行"？」→ 答：所有关键分支都跑过真实进程来验证，而不是读代码猜；第 3 条（`ExitCode` 恒空）就是"看起来对、实际静默失效"的典型，是实测才抓到的。
   - 「为什么不直接 `next dev`？」→ 答：先尝试 dev（保留热重载这个开发体验），失败且错误特征明确时才降级到生产模式，并且明确告知用户"已降级、无热重载"，不做静默妥协。
   - 「为什么 kill 进程这么麻烦？」→ 答：Windows 上占端口的是子进程而不是包装进程，所以按**端口所有者**记录 PID；并且任何 kill 都要检查返回码，"报成功"与"真停掉"是两件事。
+## 2026-10-12 体验修复 不要南瓜却推荐南瓜菜 + 前端冗余文案清理
+- 问题：用户输入"不要南瓜"，推荐第 2 名仍是"山药南瓜炖鸡汤"；卡片里反复出现"命中你的需求「xxx」的混合检索第 N 名结果""用户想吃番茄，这道菜以西红柿为主要食材"等机械文案；每次查询都弹"本次走了降级路径 recommendation_shortfall"。
+- 原因：
+  1. 食材词表（aliases.yaml）里根本没有"南瓜"这个标准食材，别名表里也没有"小南瓜"→"南瓜"的映射。山药南瓜炖鸡汤的食材原文写的是"小南瓜"，硬约束 SQL 用精确等值匹配 
+ame_raw = '南瓜'，"小南瓜" ≠ "南瓜"，NOT EXISTS 不命中，这道菜漏过了过滤。对比"清蒸南瓜"（name_raw 就是"南瓜"）反而被正确排除——证明 SQL 逻辑本身没错，是词表缺失。
+  2. 规则兜底 reason 模板写死了"命中你的需求「{}」的混合检索第 N 名结果"，LLM 一旦条数不够走兜底，这句机械话就直接展示给用户。
+  3. GENERATE_SYSTEM_PROMPT 要求"最多输出 3 条"，top_k=3 时 LLM 经常只给 2 条，validate 阶段发现数量不足就补候选，每次都触发 recommendation_shortfall。
+  4. 前端 DEGRADATION_LABELS 没登记 recommendation_shortfall 的中文释义，直接原样显示英文标签。
+- 解决：
+  1. aliases.yaml 加"南瓜"标准食材 + [小南瓜, 金瓜, 倭瓜, 番瓜, 南瓜块, 南瓜泥] 别名；直接在 DB 里 INSERT ingredients + ingredient_aliases，并 UPDATE recipe_ingredients 把 name_raw 命中别名的行回填 ingredient_id（不重跑 build_index，避免重建 embedding）。验证：所有菜名含"南瓜"的菜现在都被 NOT EXISTS 正确排除。
+  2. _rule_recommendation 模板改成"根据你的需求检索到这道菜"，不再暴露"混合检索第 N 名"系统术语。
+  3. GENERATE_SYSTEM_PROMPT 把"最多输出 3 条"改成"必须输出恰好 N 条，一条都不能少"，并在 user message 里明确条数。
+  4. DEGRADATION_LABELS 补 recommendation_shortfall = "模型给出的条数不足，已用剩余候选补齐到你要的数量"。
+  5. 顺带：热量标签去掉"（HowToCook 预估）"后缀；删除"按烹饪时长筛选（暂不可用）"占位块；隐藏厨具选择 UI（数据上游不含 tools，类型保留）；加菜谱分类快捷按钮（breakfast/soup/staple 等→中文，后端 HardFilters+SQL 已下推 category 列）；logging.py 加 RotatingFileHandler（5MB×3 滚动）。
+- 面试可能会问：
+  - 「硬约束下推为什么还会漏？」答：SQL 逻辑对，但匹配是精确等值；食材写法有别名差异（小南瓜≠南瓜）时，词表没覆盖就漏了。根因是数据不是代码——同义词表要持续补，不能假设上游食材名规范。
+  - 「为什么每次都 shortfall？」答：prompt 写"最多 3 条"模型就给 2 条；改成"必须恰好 N 条"后预期缓解。这是 prompt 工程的典型坑：上界指令被模型理解为下界。

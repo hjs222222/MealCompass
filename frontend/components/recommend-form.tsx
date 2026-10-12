@@ -9,7 +9,27 @@ const QUERY_MAX_LENGTH = 200;
 const TOP_K_MIN = 1;
 const TOP_K_MAX = 5;
 
-const TOOL_OPTIONS = ["炒锅", "平底锅", "蒸锅", "空气炸锅", "烤箱", "微波炉", "电饭煲"] as const;
+/**
+ * 菜谱分类快捷选项。
+ *
+ * 来源：data/raw/howtocook/ 下的一级目录（breakfast / soup / meat_dish …），
+ * 已落库到 recipes.category 列（见 backend/infra/tables.py，有 ix_recipes_category 索引）。
+ * 中文译名面向普通用户；英文 slug 原样提交给后端做 SQL 下推。
+ *
+ * 注意：厨具相关字段（tools_available）虽然还在 RecommendRequest 类型里保留，
+ * 但 HowToCook 上游数据不含 tools 字段（import 后 recipes.tools 恒为 []），
+ * 因此前端不再展示厨具选择 UI；后端字段保留以备将来接入有厨具数据的源。
+ */
+const CATEGORY_OPTIONS: { slug: string; label: string }[] = [
+  { slug: "breakfast", label: "早餐" },
+  { slug: "staple", label: "主食" },
+  { slug: "soup", label: "汤品" },
+  { slug: "meat_dish", label: "荤菜" },
+  { slug: "vegetable_dish", label: "素菜" },
+  { slug: "aquatic", label: "水产" },
+  { slug: "dessert", label: "甜点" },
+  { slug: "drink", label: "饮品" },
+];
 
 const INPUT_CLASS =
   "w-full px-5 py-3 bg-white border border-stone-200 rounded-full text-stone-800 placeholder:text-stone-400 focus:border-stone-400 focus:ring-2 focus:ring-stone-200 transition-all duration-300";
@@ -55,22 +75,14 @@ function parseIntegerInRange(raw: string, min: number, max: number): number | nu
 export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
   const fieldId = useId();
   const queryId = `${fieldId}-query`;
-  const toolsId = `${fieldId}-tools`;
   const excludedId = `${fieldId}-excluded`;
   const topKId = `${fieldId}-top-k`;
-  const timeId = `${fieldId}-time`;
 
   const [query, setQuery] = useState("");
-  const [toolsAvailable, setToolsAvailable] = useState<string[]>([]);
+  const [category, setCategory] = useState<string | null>(null);
   const [excludedRaw, setExcludedRaw] = useState("");
   const [topK, setTopK] = useState("3");
   const [errors, setErrors] = useState<FieldErrors>({});
-
-  const toggleTool = (tool: string): void => {
-    setToolsAvailable((current) =>
-      current.includes(tool) ? current.filter((item) => item !== tool) : [...current, tool],
-    );
-  };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -95,9 +107,12 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
 
     onSubmit({
       query: trimmedQuery,
-      tools_available: toolsAvailable,
+      // tools_available 字段保留在类型里，但上游数据不含厨具，UI 不再收集；
+      // 传空数组等价于"不限厨具"，与后端默认行为一致。
+      tools_available: [],
       excluded_ingredients: parseExcludedIngredients(excludedRaw),
       top_k: parsedTopK === "invalid" || parsedTopK === null ? 3 : parsedTopK,
+      ...(category !== null ? { category } : {}),
     });
   };
 
@@ -110,7 +125,7 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
     >
       <h2 className="font-serif text-xl text-stone-800 md:text-2xl">告诉我你想吃什么</h2>
       <p className="mt-2 text-sm leading-relaxed text-stone-600">
-        只写「随便」也可以；写清楚忌口和厨具会得到更贴近需求的结果。带 <span aria-hidden="true">*</span>{" "}
+        只写「随便」也可以；写清楚忌口会得到更贴近需求的结果。带 <span aria-hidden="true">*</span>{" "}
         的是必填项。
       </p>
 
@@ -143,6 +158,36 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
           ) : null}
         </div>
 
+        <fieldset>
+          <legend className={LABEL_CLASS}>按分类挑（可选）</legend>
+          <p className={HINT_CLASS}>选一个分类会只在该类菜谱里推荐；不选则全部类别都可。</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            {CATEGORY_OPTIONS.map((option) => {
+              const checked = category === option.slug;
+              return (
+                <label
+                  key={option.slug}
+                  className={`inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border px-5 py-2 text-sm transition-colors duration-300 ${
+                    checked
+                      ? "border-stone-800 bg-stone-800 text-stone-50"
+                      : "border-stone-300 bg-transparent text-stone-800 hover:bg-stone-100"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="category"
+                    value={option.slug}
+                    checked={checked}
+                    onChange={() => setCategory(checked ? null : option.slug)}
+                    className="h-4 w-4 accent-stone-800"
+                  />
+                  <span>{option.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
         <div>
           <label htmlFor={topKId} className={LABEL_CLASS}>
               希望推荐几条
@@ -170,47 +215,6 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
               </p>
             ) : null}
           </div>
-
-        <div>
-          <label htmlFor={timeId} className={LABEL_CLASS}>按烹饪时长筛选（暂不可用）</label>
-          <input id={timeId} type="text" disabled value="待菜谱全程时长核实后开放"
-            aria-describedby={`${timeId}-hint`} className={`mt-2 ${INPUT_CLASS} cursor-not-allowed bg-stone-100`} />
-          <p id={`${timeId}-hint`} className={HINT_CLASS}>
-            只有原文明示的全程时长才会显示在推荐卡片上；当前不能用它筛选结果。
-          </p>
-        </div>
-
-        <fieldset aria-describedby={`${toolsId}-hint`}>
-          <legend className={LABEL_CLASS}>你有哪些厨具（可选）</legend>
-          <p id={`${toolsId}-hint`} className={HINT_CLASS}>
-            不选表示不限厨具；菜谱用到的厨具必须都在你勾选的范围内。
-          </p>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {TOOL_OPTIONS.map((tool) => {
-              const checked = toolsAvailable.includes(tool);
-              return (
-                <label
-                  key={tool}
-                  className={`inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border px-5 py-2 text-sm transition-colors duration-300 ${
-                    checked
-                      ? "border-stone-800 bg-stone-800 text-stone-50"
-                      : "border-stone-300 bg-transparent text-stone-800 hover:bg-stone-100"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    name="tools_available"
-                    value={tool}
-                    checked={checked}
-                    onChange={() => toggleTool(tool)}
-                    className="h-4 w-4 accent-stone-800"
-                  />
-                  <span>{tool}</span>
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
 
         <div>
           <label htmlFor={excludedId} className={LABEL_CLASS}>

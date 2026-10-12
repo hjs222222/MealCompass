@@ -170,6 +170,9 @@ canonical:
   - name: 冬瓜
     category: 蔬果
     aliases: []
+  - name: 南瓜
+    category: 蔬果
+    aliases: [小南瓜, 金瓜, 倭瓜, 番瓜, 南瓜块, 南瓜泥]
   - name: 苦瓜
     category: 蔬果
     aliases: [凉瓜]
