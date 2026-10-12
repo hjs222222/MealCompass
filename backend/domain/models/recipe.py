@@ -3,7 +3,7 @@
 字段设计原则（来自 `docs/PRD.md` 与 `docs/DATA_SOURCES.md`）：
 
 - **不编造**：上游没有的字段一律留 ``None``，并保留原文（``amount_text``），绝不猜。
-- ``time_minutes`` 上游不提供 → 恒为 ``None``，由规则层按难度兜底并标注不确定。
+- ``time_minutes`` 当前解析未提取简介中的明示时长，暂为 ``None``；不得把单步时长冒充总时长。
 - 只保留热量，不做蛋白质 / GI / 钠推断（本项目不做医学人群细分）。
 """
 
@@ -52,7 +52,7 @@ class Recipe(BaseModel):
     difficulty: int | None = Field(default=None, ge=1, le=5)
     calories_kcal: int | None = None
     calories_source: str | None = None
-    time_minutes: int | None = Field(default=None, description="上游不提供，恒为 None")
+    time_minutes: int | None = Field(default=None, description="原文明示的全程时长尚未结构化提取")
 
     servings_text: str | None = None
     ingredients: list[Ingredient] = Field(default_factory=list)

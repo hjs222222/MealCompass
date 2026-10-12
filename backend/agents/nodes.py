@@ -279,7 +279,7 @@ def _to_recommendation(item: dict[str, Any], by_id: dict[str, RecipeCandidate]) 
         reason=reason,
         missing_ingredients=coerce_str_list(item.get("missing_ingredients")),
         substitutions=coerce_str_list(item.get("substitutions")),
-        time_minutes=None,  # 库内 time_minutes 全为 NULL：既不编造，也不假装知道
+        time_minutes=None,  # 当前候选不携带可靠的结构化总时长
     )
 
 

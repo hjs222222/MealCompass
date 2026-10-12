@@ -116,7 +116,7 @@ recipes = sa.Table(
     sa.Column("category", sa.String(40), nullable=False, server_default=sa.text("''")),
     sa.Column("description", sa.Text),
     sa.Column("difficulty", sa.SmallInteger),  # ★ 1-5
-    sa.Column("time_minutes", sa.Integer),  # 上游不提供，恒为 NULL
+    sa.Column("time_minutes", sa.Integer),  # 当前解析未提取原文明示的全程时长
     sa.Column("nutrition", JSONB, nullable=False, server_default=_EMPTY_OBJECT),
     _jsonb_array("tools"),
     _jsonb_array("tags"),

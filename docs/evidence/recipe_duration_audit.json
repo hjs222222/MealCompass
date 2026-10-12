@@ -1,0 +1,80 @@
+{
+  "source": "data/recipes/howtocook.json",
+  "raw_root": "data/raw/howtocook",
+  "counts": {
+    "description_with_duration_unit": 370,
+    "extracted": 367,
+    "recipes": 372
+  },
+  "missing_count": 5,
+  "missing": [
+    {
+      "recipe": "番茄红酱",
+      "source_path": "meat_dish/番茄红酱.md",
+      "description": "这款意式风味酱料香浓可口，蔬菜与牛肉的搭配带来丰富口感。它富含蛋白质和多种维生素，营养均衡。制作过程稍有繁琐，需要一些烹饪基础，例如炒出颗粒感的牛肉和控火慢煮。从备料到完成约需一小时，一次可多做一些冷冻保存，随取随用十分方便。"
+    },
+    {
+      "recipe": "葱烧鸡腿",
+      "source_path": "meat_dish/葱烧鸡腿.md",
+      "description": "葱烧鸡腿是一道只靠鸡腿和大葱两种核心食材就能完成的下饭家常菜。鸡腿肉外焦里嫩，葱香浓郁，做法简单，全程一口锅，新手也能一次成功。蛋白质丰富，搭配米饭尤其合适，适合工作日快手晚餐。"
+    },
+    {
+      "recipe": "日式肥牛丼饭",
+      "source_path": "staple/日式肥牛丼饭/日式肥牛丼饭.md",
+      "description": "一道经典的日式家常盖饭，肥牛片与白洋葱在咸甜酱汁中炖煮入味，肉质软嫩，洋葱甜润，汁香浓郁。牛肉提供优质蛋白和血红素铁，洋葱富含膳食纤维与多种抗氧化物。制作不算复杂，新手只要跟着步骤操作也能轻松完成，炒煮过程约需 30 分钟。"
+    },
+    {
+      "recipe": "猪油拌饭",
+      "source_path": "staple/猪油拌饭.md",
+      "description": "这是一道充满南方家常气息的简单拌饭，米粒被融化的猪油包裹，透着酱油的咸鲜和葱花的清香，是许多孩子食欲不振时的安心之选。主要提供快速碳水与脂肪能量，但胆固醇较高，不宜常吃。制作毫无门槛，哪怕完全不会做饭也能轻松完成，煮好的米饭只要几分钟就能拌出一碗香喷喷的主食。"
+    },
+    {
+      "recipe": "凉拌木耳",
+      "source_path": "vegetable_dish/凉拌木耳/凉拌木耳.md",
+      "description": "凉拌木耳，由于发放物资中有很多干货，木耳是较为健康的食物。且凉拌木耳的烹饪方式也相对简单。"
+    }
+  ],
+  "examples": [
+    {
+      "recipe": "咖喱炒蟹",
+      "time_text": "从备料到出锅约需 30 分钟。",
+      "source_path": "aquatic/咖喱炒蟹.md"
+    },
+    {
+      "recipe": "响油鳝丝",
+      "time_text": "从备料到出锅，一般 大约 40 分钟就能端上餐桌。",
+      "source_path": "aquatic/响油鳝丝.md"
+    },
+    {
+      "recipe": "小龙虾",
+      "time_text": "从备料到出锅大约需要 45 分钟。",
+      "source_path": "aquatic/小龙虾/小龙虾.md"
+    },
+    {
+      "recipe": "干煎阿根廷红虾",
+      "time_text": "预计 大约 20 分钟即可完成。",
+      "source_path": "aquatic/干煎阿根廷红虾/干煎阿根廷红虾.md"
+    },
+    {
+      "recipe": "微波葱姜黑鳕鱼",
+      "time_text": "从备料到上桌大约只需二十分钟。",
+      "source_path": "aquatic/微波葱姜黑鳕鱼.md"
+    },
+    {
+      "recipe": "水煮鱼",
+      "time_text": "预计制作时长约 2 小时。",
+      "source_path": "aquatic/水煮鱼.md"
+    },
+    {
+      "recipe": "油焖大虾",
+      "time_text": "制作时需要炼葱油、剪虾、焖烧、收汁，对火候和调味把握有一定要求，更适合有基础的厨友尝试，全程大约需要 40 分钟。",
+      "source_path": "aquatic/油焖大虾/油焖大虾.md"
+    },
+    {
+      "recipe": "烤鱼",
+      "time_text": "从备料到上桌大约需要一小时。",
+      "source_path": "aquatic/混合烤鱼/烤鱼.md"
+    }
+  ],
+  "note": "Duration text is display prose, not numeric total minutes; exclusions and alternatives remain in source."
+}

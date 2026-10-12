@@ -24,6 +24,7 @@ from core.config import Settings, get_settings
 from core.exceptions import request_id_context
 from domain.models.recommend import RecommendRequest, RecommendResponse, SearchRequest, SearchResponse
 from domain.models.retrieval import HardFilters
+from domain.ports import RecipeDetailsReader, RecipeStepsReader
 from infra.observability import SpanName, attributes, traced
 
 logger = logging.getLogger(__name__)
@@ -57,10 +58,20 @@ def _recipe_names(items: Sequence[Any]) -> list[str]:
 class RecommendService:
     """一次推荐 / 检索请求的编排入口。"""
 
-    def __init__(self, *, retriever: Any, llm: Any, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        retriever: Any,
+        llm: Any,
+        settings: Settings | None = None,
+        steps_reader: RecipeStepsReader | None = None,
+        details_reader: RecipeDetailsReader | None = None,
+    ) -> None:
         self._retriever = retriever
         self._llm = llm
         self._settings = settings or get_settings()
+        self._steps_reader = steps_reader
+        self._details_reader = details_reader
 
     @property
     def settings(self) -> Settings:
@@ -99,6 +110,52 @@ class RecommendService:
                 },
                 metadata={"node_path": response.node_path},
             )
+        if response.recommendations and self._details_reader is not None:
+            try:
+                recipe_ids = [item.recipe_id for item in response.recommendations]
+                detail_map = await self._details_reader.get_details(recipe_ids)
+            except Exception as exc:  # noqa: BLE001 - source details must not invalidate safe recommendations
+                logger.warning("读取菜谱详情失败：%s", type(exc).__name__)
+                response = response.model_copy(
+                    update={
+                        "degraded": True,
+                        "degradations": [*response.degradations, "recipe_details_unavailable"],
+                    }
+                )
+            else:
+                response = response.model_copy(
+                    update={
+                        "recommendations": [
+                            item.model_copy(
+                                update={
+                                    "details": detail_map.get(item.recipe_id),
+                                    "steps": detail_map[item.recipe_id].steps if item.recipe_id in detail_map else [],
+                                }
+                            )
+                            for item in response.recommendations
+                        ]
+                    }
+                )
+        elif response.recommendations and self._steps_reader is not None:
+            try:
+                step_map = await self._steps_reader.get_steps([item.recipe_id for item in response.recommendations])
+            except Exception as exc:  # noqa: BLE001 - details must not turn a valid recommendation into 500
+                logger.warning("读取菜谱步骤失败：%s", type(exc).__name__)
+                response = response.model_copy(
+                    update={
+                        "degraded": True,
+                        "degradations": [*response.degradations, "recipe_steps_unavailable"],
+                    }
+                )
+            else:
+                response = response.model_copy(
+                    update={
+                        "recommendations": [
+                            item.model_copy(update={"steps": step_map.get(item.recipe_id, [])})
+                            for item in response.recommendations
+                        ]
+                    }
+                )
         return response
 
     async def search(self, request: SearchRequest, *, session_id: str | None = None) -> SearchResponse:

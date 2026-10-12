@@ -6,8 +6,6 @@ import type { RecommendRequest } from "@/lib/api";
 
 /** 与 backend/domain/models/recommend.py 的字段约束逐项对齐。 */
 const QUERY_MAX_LENGTH = 200;
-const TIME_MIN_MINUTES = 1;
-const TIME_MAX_MINUTES = 600;
 const TOP_K_MIN = 1;
 const TOP_K_MAX = 5;
 
@@ -23,7 +21,6 @@ const ERROR_CLASS = "mt-1 text-xs text-stone-800";
 
 type FieldErrors = {
   query?: string;
-  maxTimeMinutes?: string;
   topK?: string;
 };
 
@@ -58,13 +55,12 @@ function parseIntegerInRange(raw: string, min: number, max: number): number | nu
 export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
   const fieldId = useId();
   const queryId = `${fieldId}-query`;
-  const timeId = `${fieldId}-time`;
   const toolsId = `${fieldId}-tools`;
   const excludedId = `${fieldId}-excluded`;
   const topKId = `${fieldId}-top-k`;
+  const timeId = `${fieldId}-time`;
 
   const [query, setQuery] = useState("");
-  const [maxTimeMinutes, setMaxTimeMinutes] = useState("");
   const [toolsAvailable, setToolsAvailable] = useState<string[]>([]);
   const [excludedRaw, setExcludedRaw] = useState("");
   const [topK, setTopK] = useState("3");
@@ -87,11 +83,6 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
       nextErrors.query = `需求最多 ${QUERY_MAX_LENGTH} 字，当前 ${trimmedQuery.length} 字。`;
     }
 
-    const parsedTime = parseIntegerInRange(maxTimeMinutes, TIME_MIN_MINUTES, TIME_MAX_MINUTES);
-    if (parsedTime === "invalid") {
-      nextErrors.maxTimeMinutes = `耗时必须是不超过 ${TIME_MAX_MINUTES} 分钟的正整数。`;
-    }
-
     const parsedTopK = parseIntegerInRange(topK, TOP_K_MIN, TOP_K_MAX);
     if (parsedTopK === "invalid") {
       nextErrors.topK = `推荐条数需在 ${TOP_K_MIN}–${TOP_K_MAX} 之间。`;
@@ -104,7 +95,6 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
 
     onSubmit({
       query: trimmedQuery,
-      max_time_minutes: parsedTime === "invalid" ? null : parsedTime,
       tools_available: toolsAvailable,
       excluded_ingredients: parseExcludedIngredients(excludedRaw),
       top_k: parsedTopK === "invalid" || parsedTopK === null ? 3 : parsedTopK,
@@ -120,7 +110,7 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
     >
       <h2 className="font-serif text-xl text-stone-800 md:text-2xl">告诉我你想吃什么</h2>
       <p className="mt-2 text-sm leading-relaxed text-stone-600">
-        只写「随便」也可以，但写清楚时间、忌口和厨具会得到更靠谱的结果。带 <span aria-hidden="true">*</span>{" "}
+        只写「随便」也可以；写清楚忌口和厨具会得到更贴近需求的结果。带 <span aria-hidden="true">*</span>{" "}
         的是必填项。
       </p>
 
@@ -140,7 +130,7 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
             onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
             aria-invalid={errors.query !== undefined}
             aria-describedby={`${queryId}-hint`}
-            placeholder="例如：20 分钟内能做的家常菜，不要香菜"
+            placeholder="例如：想吃家常菜，不要香菜"
             className={`mt-2 ${INPUT_CLASS}`}
           />
           <p id={`${queryId}-hint`} className={HINT_CLASS}>
@@ -153,38 +143,8 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
           ) : null}
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div>
-            <label htmlFor={timeId} className={LABEL_CLASS}>
-              最长烹饪时间（分钟，可选）
-            </label>
-            <input
-              id={timeId}
-              name="max_time_minutes"
-              type="number"
-              inputMode="numeric"
-              min={TIME_MIN_MINUTES}
-              max={TIME_MAX_MINUTES}
-              step={1}
-              value={maxTimeMinutes}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setMaxTimeMinutes(event.target.value)}
-              aria-invalid={errors.maxTimeMinutes !== undefined}
-              aria-describedby={`${timeId}-hint`}
-              placeholder="留空表示不限"
-              className={`mt-2 ${INPUT_CLASS}`}
-            />
-            <p id={`${timeId}-hint`} className={HINT_CLASS}>
-              超时的菜会被硬约束直接排除；耗时未知的菜同样按「做不出来」排除。
-            </p>
-            {errors.maxTimeMinutes !== undefined ? (
-              <p role="alert" className={ERROR_CLASS}>
-                {errors.maxTimeMinutes}
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <label htmlFor={topKId} className={LABEL_CLASS}>
+        <div>
+          <label htmlFor={topKId} className={LABEL_CLASS}>
               希望推荐几条
             </label>
             <input
@@ -210,6 +170,14 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
               </p>
             ) : null}
           </div>
+
+        <div>
+          <label htmlFor={timeId} className={LABEL_CLASS}>按烹饪时长筛选（暂不可用）</label>
+          <input id={timeId} type="text" disabled value="待菜谱全程时长核实后开放"
+            aria-describedby={`${timeId}-hint`} className={`mt-2 ${INPUT_CLASS} cursor-not-allowed bg-stone-100`} />
+          <p id={`${timeId}-hint`} className={HINT_CLASS}>
+            只有原文明示的全程时长才会显示在推荐卡片上；当前不能用它筛选结果。
+          </p>
         </div>
 
         <fieldset aria-describedby={`${toolsId}-hint`}>

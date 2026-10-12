@@ -6,12 +6,13 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from api.deps import close_recommend_service
 from api.v1.health import router as health_router
@@ -20,6 +21,8 @@ from core.config import Settings, get_settings
 from core.exceptions import AppError, ErrorResponse, request_id_context
 from core.logging import configure_logging
 
+RECIPE_IMAGE_ROOT = (Path(__file__).resolve().parents[1] / "data" / "raw" / "howtocook").resolve()
+RECIPE_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 REQUEST_ID_HEADER = "X-Request-ID"
 REQUEST_ID_MAX_LENGTH = 128
 http_logger = logging.getLogger("mealcompass.http")
@@ -142,6 +145,18 @@ def create_app(settings: Settings | None = None, *, include_test_routes: bool = 
     )
     application.include_router(health_router)
     application.include_router(recommend_router)
+
+    @application.get("/recipe-images/{image_path:path}", include_in_schema=False)
+    async def recipe_image(image_path: str) -> FileResponse:
+        parts = image_path.replace("\\", "/").split("/")
+        if not parts or any(part in {"", ".", ".."} for part in parts):
+            raise HTTPException(status_code=404)
+        target = RECIPE_IMAGE_ROOT.joinpath(*parts).resolve()
+        if not target.is_relative_to(RECIPE_IMAGE_ROOT) or target.suffix.lower() not in RECIPE_IMAGE_SUFFIXES:
+            raise HTTPException(status_code=404)
+        if not target.is_file():
+            raise HTTPException(status_code=404)
+        return FileResponse(target)
 
     if include_test_routes:
 

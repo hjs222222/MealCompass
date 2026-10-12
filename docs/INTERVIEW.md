@@ -90,7 +90,7 @@
 **答**：`HybridRetriever._allowed_recipe_statement()` 先构造一个只含合法 `recipe_id` 的子查询：
 
 - **厨具**：菜谱的 `tools` 必须是用户 `tools_available` 的**子集** → `recipes.tools <@ :tools`（PG 数组包含操作符）
-- **时间**：`time_minutes IS NOT NULL AND time_minutes <= :max`——**注意这里刻意排除了 NULL**，因为上游不提供时长，未知时长按严格安全语义不能算"满足约束"
+- **时间**：`time_minutes IS NOT NULL AND time_minutes <= :max`——**注意这里刻意排除了 NULL**，因为当前解析未提取部分原文明示的全程时长，未知时长按严格安全语义不能算"满足约束"
 - **忌口**：`NOT EXISTS` 三层匹配——标准名 `ingredients.name`、原文 `recipe_ingredients.name_raw`、别名 `ingredient_aliases.alias`，全部 `.lower()` 后比较
 
 然后这个集合**分别**约束向量通道和 BM25 通道。
@@ -419,7 +419,7 @@ cd backend && .venv\Scripts\python.exe -m scripts.eval --mode all
 差距 21pp 的来源，按贡献排序（**都不是排序算法**）：
 
 1. **金标准集不完整（最大项）**：每条查询只标 1–3 个相关菜，而库里存在大量同样满足约束的合法答案。启发式估算显示 Top10 里「未标注但按查询约束看确实合法」的占比很高（若标注完整，precision@10 约为 54.6% / 56.2% / 65.8%），**所以 Recall 被系统性低估**。
-2. **scene / taste 类没有结构化元数据**：`time_minutes` **372 行全为 NULL**、`tools` 非空仅 82 行，所以这两类查询在语料里根本没有可用的答案信号（三组都只有 16.7%–50%）。
+2. **scene / taste 类没有结构化元数据**：评估时结构化 `time_minutes` **372 行全为 NULL**（解析遗漏，不能归因于上游全无时长）、`tools` 非空仅 82 行；简介仍可能含时长原文，但结构化时间过滤不可用（三组都只有 16.7%–50%）。
 3. **剩下的才是排序问题。**
 
 **关键是我没有为了接近 85% 去调参或改标注。** 面试时这句话必须说出来——**指标不好看可以解释，造假解释不了。**
@@ -531,7 +531,7 @@ cd backend && .venv\Scripts\python.exe -m scripts.eval --mode all
 2. **补生成侧评估**（RAGAS 的 Faithfulness / Answer Relevancy），现在只评了检索侧。
 3. **会话持久化接线**：`langgraph-checkpoint-postgres` 已装、`conversations` / `messages` 表已建，把 `PostgresSaver` 挂到 `compile(checkpointer=...)` 就有了多轮对话。
 4. **引入 `import-linter`** 把分层规则变成 CI 门禁。
-5. **修时间约束**：`time_minutes` 全为 NULL 是上游数据缺口。正确做法是**用 LLM 从步骤文本里估计时长并标注为"模型估计、非上游数据"**，而不是编造——但产品语义要改成"估计值，仅供筛选参考"。
+5. **修时间约束的归因**：结构化时长全空是解析器固定写空和推荐链路固化假设，部分原文已有明确总时长。用户已决定不做模型估算并隐藏耗时 UI；后续若恢复此能力，应先提取原文明示全程时长、保留约值和区间来源，避免把单步时间当总时长。
 6. **前端接 Playwright** 做 1 条端到端冒烟（目前前端 0 测试）。
 7. **限流与成本控制**：Redis 已起但代码没用，LLM 调用应该按用户/会话限流。
 

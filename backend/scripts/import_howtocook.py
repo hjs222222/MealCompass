@@ -14,7 +14,7 @@
 1. **不编造**：上游没写的字段留 ``None``，原始文本进 ``amount_text``；
    解析不出用量的行进报告等人工确认，绝不猜数字。
 2. 用量优先取 ``## 计算``（每份），``## 必备原料和工具`` 只用来补名字与厨具。
-3. ``time_minutes`` 上游不提供 → 恒为 ``None``（由规则层按难度兜底并标注不确定）。
+3. ``time_minutes`` 当前恒为 ``None``：解析器未提取简介中部分菜谱明确写出的全程时长。
 4. 厨具识别是启发式关键词表：命中即收敛到关键词本身；整句说明既不算食材也不算厨具，直接丢弃。
 5. 上游有两种目录布局：``分类/菜名.md`` 与 ``分类/菜名/菜名.md``，分类一律取**顶层目录**。
 6. 配图按原文件名保留，转成**数据集内相对路径**（前端详情页直接取用）；外链图单独存 ``external_images``。
@@ -704,7 +704,7 @@ def parse_recipe_markdown(
         difficulty=parse_difficulty(text),
         calories_kcal=calories,
         calories_source=CALORIES_SOURCE if calories is not None else None,
-        time_minutes=None,  # 上游不提供，不猜
+        time_minutes=None,  # 当前未提取原文明示的全程时长；不推算单步时间
         servings_text=_prose(sections["计算"]),
         ingredients=list(ingredients.values()),
         tools=tools,

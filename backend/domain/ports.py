@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
 from domain.models.recipe import Recipe
+from domain.models.recipe_details import RecipeDetails
 from domain.models.retrieval import HardFilters, RecipeCandidate
 
 
@@ -23,6 +24,22 @@ class RecipeRepository(Protocol):
 
     async def search(self, filters: HardFilters | None = None, limit: int = 50) -> list[Recipe]:
         """按硬约束检索菜谱，返回至多 ``limit`` 条结果。"""
+        ...
+
+
+@runtime_checkable
+class RecipeDetailsReader(Protocol):
+    async def get_details(self, recipe_ids: Sequence[str]) -> dict[str, RecipeDetails]:
+        """Read authoritative content for validated IDs, including ordered steps."""
+        ...
+
+
+@runtime_checkable
+class RecipeStepsReader(Protocol):
+    """Read authoritative recipe steps without changing retrieval or generating content."""
+
+    async def get_steps(self, recipe_ids: Sequence[str]) -> dict[str, list[str]]:
+        """Return steps ordered by step_no for the requested, validated recipe IDs."""
         ...
 
 

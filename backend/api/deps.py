@@ -17,6 +17,7 @@ from core.config import Settings, get_settings
 from infra.db import get_engine
 from infra.embedding_client import build_embedding_client
 from infra.llm_client import build_llm_client
+from infra.recipe_details import SqlRecipeDetailsReader
 from infra.rerank_client import build_rerank_client
 from rag.corpus import CardCorpus, load_card_documents
 from rag.retriever import HybridRetriever
@@ -60,7 +61,12 @@ async def _build_service(settings: Settings) -> RecommendService:
         reranker=build_rerank_client(settings),
         engine=engine,
     )
-    return RecommendService(retriever=retriever, llm=build_llm_client(settings), settings=settings)
+    return RecommendService(
+        retriever=retriever,
+        llm=build_llm_client(settings),
+        settings=settings,
+        details_reader=SqlRecipeDetailsReader(engine),
+    )
 
 
 async def get_recommend_service(settings: AppSettings) -> RecommendService:

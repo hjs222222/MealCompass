@@ -29,6 +29,31 @@ export type VersionResponse = {
   environment: string;
 };
 
+/** backend/domain/models/recipe.py::Ingredient 与 recipe_details.py::RecipeDetails */
+export type RecipeIngredient = {
+  name: string;
+  amount_text: string | null;
+  note: string | null;
+  optional: boolean;
+  per_serving: boolean;
+};
+
+export type RecipeDetails = {
+  description: string | null;
+  time_text: string | null;
+  difficulty: number | null;
+  calories_kcal: number | null;
+  calories_source: string | null;
+  servings_text: string | null;
+  ingredients: RecipeIngredient[];
+  tools: string[];
+  steps: string[];
+  images: string[];
+  external_images: string[];
+  extra: string | null;
+  source_url: string | null;
+};
+
 /** backend/domain/models/recommendation.py::Recommendation */
 export type Recommendation = {
   recipe_id: string;
@@ -36,7 +61,9 @@ export type Recommendation = {
   reason: string;
   missing_ingredients: string[];
   substitutions: string[];
+  steps: string[];
   time_minutes: number | null;
+  details: RecipeDetails | null;
 };
 
 /** backend/domain/models/retrieval.py::RecipeCandidate */
@@ -208,6 +235,60 @@ function parseVersion(payload: unknown): VersionResponse | null {
   return { name, version, environment };
 }
 
+function parseRecipeIngredient(payload: unknown): RecipeIngredient | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  const name = readString(payload, "name");
+  if (name === null) {
+    return null;
+  }
+  return {
+    name,
+    amount_text: readNullableString(payload, "amount_text"),
+    note: readNullableString(payload, "note"),
+    optional: readBoolean(payload, "optional") ?? false,
+    per_serving: readBoolean(payload, "per_serving") ?? false,
+  };
+}
+
+function parseRecipeDetails(payload: unknown): RecipeDetails | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  const rawIngredients = readArray(payload, "ingredients");
+  const tools = readStringArray(payload, "tools");
+  const steps = readStringArray(payload, "steps");
+  const images = readStringArray(payload, "images");
+  const externalImages = readStringArray(payload, "external_images");
+  if (rawIngredients === null || tools === null || steps === null || images === null || externalImages === null) {
+    return null;
+  }
+  const ingredients: RecipeIngredient[] = [];
+  for (const ingredient of rawIngredients) {
+    const parsed = parseRecipeIngredient(ingredient);
+    if (parsed === null) {
+      return null;
+    }
+    ingredients.push(parsed);
+  }
+  return {
+    description: readNullableString(payload, "description"),
+    time_text: readNullableString(payload, "time_text"),
+    difficulty: readNullableNumber(payload, "difficulty"),
+    calories_kcal: readNullableNumber(payload, "calories_kcal"),
+    calories_source: readNullableString(payload, "calories_source"),
+    servings_text: readNullableString(payload, "servings_text"),
+    ingredients,
+    tools,
+    steps,
+    images,
+    external_images: externalImages,
+    extra: readNullableString(payload, "extra"),
+    source_url: readNullableString(payload, "source_url"),
+  };
+}
+
 function parseRecommendation(payload: unknown): Recommendation | null {
   if (!isRecord(payload)) {
     return null;
@@ -217,7 +298,13 @@ function parseRecommendation(payload: unknown): Recommendation | null {
   const reason = readString(payload, "reason");
   const missing = readStringArray(payload, "missing_ingredients");
   const substitutions = readStringArray(payload, "substitutions");
-  if (recipeId === null || name === null || reason === null || missing === null || substitutions === null) {
+  const steps = payload.steps === undefined ? [] : readStringArray(payload, "steps");
+  if (recipeId === null || name === null || reason === null || missing === null || substitutions === null || steps === null) {
+    return null;
+  }
+  const detailsPayload = payload.details;
+  const details = detailsPayload === undefined || detailsPayload === null ? null : parseRecipeDetails(detailsPayload);
+  if (detailsPayload !== undefined && detailsPayload !== null && details === null) {
     return null;
   }
   return {
@@ -226,7 +313,9 @@ function parseRecommendation(payload: unknown): Recommendation | null {
     reason,
     missing_ingredients: missing,
     substitutions,
+    steps,
     time_minutes: readNullableNumber(payload, "time_minutes"),
+    details,
   };
 }
 

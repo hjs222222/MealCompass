@@ -435,6 +435,8 @@ class RerankClient(Protocol):
     async def rerank(self, query: str, docs: list[str], top_k: int = 10) -> list[tuple[int, float]]: ...
 ```
 
+**推荐菜谱详情展示（W3.12）**：`domain.ports.RecipeDetailsReader.get_details(recipe_ids)` 批量读取最终引用 ID 的菜谱详情；`infra.recipe_details.SqlRecipeDetailsReader` 读取原料份量、工具、步骤、附加说明、图片及来源，并由纯函数提取简介中明确的原文总时长文本（保留约值/区间）。Agent 完成引用校验后，service 只为最终 ID 补充 `Recommendation.details`，前端折叠展示完整菜谱卡片。图片通过受限 `/recipe-images/{path}` 静态端点提供；路径越界、非图片后缀和不存在文件返回 404。读取详情失败保留推荐并标记 `recipe_details_unavailable`。步骤详情展示不代表步骤向量参与召回，F21 仍未实现。
+
 **接口约束**：
 
 - 所有 IO 操作 `async`
@@ -469,6 +471,8 @@ class RerankClient(Protocol):
 | v1.11 | 2026-10-11 | **新增证据层 `docs/evidence/`（入库）与 5 个复现脚本**：`scripts/e2e_probe.py`（端到端 5 场景）、`e2e_latency_summary.py`（多轮聚合成区间）、`summarize_eval_reports.py`（评估摘要 + SHA256）、`channel_attribution.py`（RRF 通道归因）、`rerank_variance.py`（重排抖动）。架构上属于**只读的观测/汇总层**：只消费 `data/eval/reports/*.json` 与 HTTP 响应，不改 `rag/`、`agents/` | 正文数字需要一个可对账的落点：`data/eval/reports/` 与 `.tmp/` 都在 gitignore 里，别人 clone 后无法验证任何数字。同时暴露出两类真实事故：探针写死响应字段名（`results` vs 契约 `candidates`）导致把 5 条候选报成 0 条；同一代码三轮延迟差 2.8 s 而给的是单一精确值 |
 
 | v1.12 | 2026-10-12 | FastAPI 入口装配 CORS 中间件；`Settings.cors_allow_origins` / `CORS_ALLOW_ORIGINS` 配置浏览器来源白名单；错误响应保留跨域头 | 浏览器 JSON POST 预检 405，状态接口虽返回 200 但无跨域头，造成 network_error |
+
+| v1.13 | 2026-10-12 | 新增 RecipeStepsReader / SqlRecipeStepsReader，推荐校验后回填原文步骤；Recommendation.steps 默认空列表，前端查看做法 | 数据库步骤已入库但推荐契约未输出，用户无法查看做法 |
 
 **迭代规则**：
 
