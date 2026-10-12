@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     app_env: Literal["dev", "staging", "prod"] = Field(default="dev", description="dev / staging / prod")
     app_version: str = "0.1.0"
     log_level: str = "INFO"
+    cors_allow_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"],
+        description="Browser origin allowlist; override with a JSON array in CORS_ALLOW_ORIGINS",
+    )
 
     # ---- LLM（OpenAI 兼容）----
     llm_api_key: str | None = None

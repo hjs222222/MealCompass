@@ -40,6 +40,8 @@
 - [X] **W3.7 证据入库与端到端复现（本次追加）**：新增 5 个入库脚本（`e2e_probe` / `e2e_latency_summary` / `summarize_eval_reports` / `channel_attribution` / `rerank_variance`）与 28 项针对它们纯函数的单测；原始输出与前后报告统一入库到 `docs/evidence/`（3 轮端到端 + 聚合区间表 + 评估摘要含 SHA256 + 抖动 + 归因 + 清理前/后 `import_report`），**含那次字段写死的误报留档** `e2e_run1_OLD_PROBE_field_bug.txt`；README 端到端表由单值改为**多轮区间 + 极差**，并如实写明 `degraded` 在三轮中会翻转
 - [X] **W3.8 数字对账进 CI（本次追加）**：新增 `backend/scripts/check_docs_consistency.py` + 28 项单测，把「正文数字必须能追到 `docs/evidence/`」从**靠人自觉**变成**跑一条命令就知道**——① README 评估表每个指标格对账 `eval_reports_summary.json`；② `hybrid_rerank` 的区间格子必须**恰好等于** `rerank_variance.txt` 的跨轮极差（手写一个"差不多"的区间会被抓）；③ README 引用的每个证据路径必须真实存在。已作为独立步骤进 CI。**并做了篡改自检**：把 R@5 改成 99.99% → exit 1；引用不存在的证据文件 → exit 1。测试数 519 → **547 passed / 4 skipped**
 
+- [X] **W3.10 浏览器跨域修复（2026-10-12）**：FastAPI 增加 CORS 来源白名单配置，覆盖 JSON POST 预检、状态接口及错误响应；12 项回归测试；真实 HTTP 推荐返回 3 条且含跨域响应头。Windows Docker 引擎未就绪排障说明同步到 README。
+
 **明确不做（三周内）**：注册登录、购物清单、一周菜单、烹饪指导模式、语音、长期记忆、多智能体、A/B 实验、付费。
 
 > 这些不是"失败"，是**主动推迟**。状态登记见 `docs/failed-features.md`。

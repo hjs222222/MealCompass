@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from api.deps import close_recommend_service
@@ -130,6 +131,15 @@ def create_app(settings: Settings | None = None, *, include_test_routes: bool = 
         return _error_response(request, error)
 
     application.middleware("http")(request_id_middleware)
+    # CORS must wrap request-id middleware so its safe 500 responses also carry CORS headers.
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=runtime_settings.cors_allow_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Accept", "Content-Type", REQUEST_ID_HEADER],
+        expose_headers=[REQUEST_ID_HEADER],
+    )
     application.include_router(health_router)
     application.include_router(recommend_router)
 

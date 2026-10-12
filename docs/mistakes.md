@@ -145,6 +145,11 @@
 - 原因：把"纪律"写进文档，和把纪律**变成可执行的门禁**，是两件不同的事。前者依赖执行者的记性，后者依赖机器。同类问题在本项目已出现过（广播"已完成"却没有命令输出，见 §4.1），说明"只写要求"是可复发的失败模式。
 - 解决：① 新增 `backend/scripts/check_docs_consistency.py`，做三类对账——README 评估表 12 个指标格 vs `eval_reports_summary.json`；`hybrid_rerank` 的区间格子必须**恰好等于** `rerank_variance.txt` 的跨轮极差；README 引用的每个证据路径必须真实存在。② 新增 **28 项单测**，其中一半是"注入错误必须报错"的篡改检测（改 R@5 为 99.99% → exit 1；引用不存在的证据 → exit 1）。③ 作为**独立步骤进 CI**。④ 写测试时发现一个**真实的分工问题**并留了钉子：把区间写成 70–80% 时，"覆盖报告值 77.50%"这条检查会**放行**——所以光有"覆盖"不够，必须有"区间必须等于实测极差"这第二条检查；专门写了 `test_check_metrics_alone_accepts_over_wide_range_hence_variance_check_exists` 把这个分工钉住，防止以后有人把它当冗余删掉。**新增规矩**：**写在文档里的纪律，必须有对应的可执行门禁；而门禁本身必须有"注入错误会失败"的测试——一个永远返回 0 的检查器比没有检查器更糟，因为它提供虚假的安全感。**
 
+## 2026-10-12 W3.10 后端已启动但浏览器报无法连接
+- 问题：`OPTIONS /recommend` 返回 405，浏览器 `/health`、`/version` 显示 `network_error, status=0`；早先 Docker 报 Linux 引擎管道不存在。
+- 原因：FastAPI 未装配 CORS 中间件；普通 HTTP 调用不执行浏览器跨域校验，因此以前的接口验证遗漏此边界。Docker 管道错误是引擎当时未就绪，排查时 postgres / redis 已 healthy。
+- 解决：增加可配置来源白名单及 CORS 中间件，默认允许本机 3000 端口，覆盖预检/正常/错误响应；12 项回归测试，真实 HTTP 推荐返回 3 条。已有 uvicorn 未使用 reload，需重启加载代码。新增 422 测试最初意外装配真实数据库，全量报事件循环关闭，已通过 dependency_overrides 隔离该用例。
+
 ## 2026-10-12 W3.9 README 声称"双层索引"，实测步骤层向量 3,806 条全是 NULL
 - 问题：用户问"项目现在能跑起来看到前端吗"，我按流程先核验数据库真实状态，结果发现 **`recipe_steps.embedding` 3,806 行全部为 NULL**（`count(*) FILTER (WHERE embedding IS NULL) = 3806`，`count(embedding) = 0`）。而 `README.md` L24 明写「双层向量索引（卡片级 + 步骤级…）✅ 已建，库里 372 + **3,806 条向量**」，L89 也写「3,806 步骤向量」。**README 在这一点上是不准确的。**
 - 原因：`scripts/seed_recipes.py:223` 用「先删后插」保证幂等——`delete(recipe_steps)` 会**连同 embedding 一起删掉**，而重插的行只含 `{recipe_id, step_no, content}`（不含 embedding）。所以**每次重灌菜谱，步骤层向量都会被清空**；而 §4.6 的证据链纪律只强调"重灌后要重跑 `build_index`"，没有强调"`seed_recipes` 会破坏步骤层"。10-11 那次重灌后确实重跑过 `build_index`（`.tmp` 里有 `pwsh-76` 的 `--layer step` 作业记录，exit 0），但**之后又跑过一次 `seed_recipes`**（`recipes.created_at` 最新为 `2026-10-07 05:18`，而卡片层 embedding 非空 → 说明卡片层是在 seed 之后单独重建的，步骤层则被 seed 清掉后**没再补**）。**"跑过重建"不等于"当前数据库里还有向量"**——这是一次典型的"把执行记录当成当前状态"。
