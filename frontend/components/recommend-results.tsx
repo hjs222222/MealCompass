@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { ApiError, type RecommendResponse, type Recommendation } from "@/lib/api";
 
 /**
@@ -34,6 +36,67 @@ const NODE_LABELS: Record<string, string> = {
 
 const CARD_CLASS = "rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8";
 const TAG_CLASS = "inline-flex items-center rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600";
+
+/**
+ * 菜谱 ID 的折叠入口。
+ *
+ * `recipe_id` 是知识库主键（UUID），对普通用户没有阅读价值；但它同时是「引用防幻觉」的
+ * 可核对凭据（`domain/citations.py` 只接受精确命中候选的 ID）。所以既不删除、也不再摆进
+ * 卡片主视觉层：默认折叠，展开后可复制；剪贴板 API 不可用（非安全上下文）时退化为手动选中。
+ */
+function RecipeIdDisclosure({ recipeId }: { recipeId: string }) {
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+
+  useEffect(() => {
+    if (!copied && !copyFailed) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCopied(false);
+      setCopyFailed(false);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [copied, copyFailed]);
+
+  async function handleCopy(): Promise<void> {
+    try {
+      if (typeof navigator === "undefined" || navigator.clipboard === undefined) {
+        throw new Error("clipboard api unavailable");
+      }
+      await navigator.clipboard.writeText(recipeId);
+      setCopyFailed(false);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+      setCopyFailed(true);
+    }
+  }
+
+  return (
+    <details className="mt-4 text-xs text-stone-600">
+      <summary className="min-h-[44px] cursor-pointer py-3 font-medium transition-colors duration-300 hover:text-stone-800">
+        查看菜谱 ID（用于核对引用）
+      </summary>
+      <div className="mt-1 flex flex-wrap items-center gap-3">
+        <code className="break-all font-mono text-[11px] text-stone-800">{recipeId}</code>
+        <button
+          type="button"
+          onClick={() => {
+            void handleCopy();
+          }}
+          aria-label="复制菜谱 ID"
+          className="min-h-[44px] rounded-full border border-stone-300 px-4 text-xs font-medium text-stone-700 transition-colors duration-300 hover:bg-stone-100"
+        >
+          {copied ? "已复制" : copyFailed ? "复制失败" : "复制 ID"}
+        </button>
+      </div>
+      <span role="status" aria-live="polite" className="sr-only">
+        {copied ? "菜谱 ID 已复制到剪贴板" : copyFailed ? "复制失败，请手动选中菜谱 ID 复制" : ""}
+      </span>
+    </details>
+  );
+}
 
 function describeError(error: Error): string {
   if (error instanceof ApiError) {
@@ -138,8 +201,9 @@ function RecommendationCard({ item }: { item: Recommendation }) {
         <span className={TAG_CLASS}>
           {item.time_minutes === null ? "耗时未知" : `${item.time_minutes} 分钟`}
         </span>
-        <span className={`${TAG_CLASS} font-mono`}>{item.recipe_id}</span>
       </div>
+
+      <RecipeIdDisclosure recipeId={item.recipe_id} />
 
       {item.missing_ingredients.length > 0 ? (
         <div className="mt-4">
@@ -235,6 +299,11 @@ export function RecommendResults({ result, error, isPending, onRetry }: Recommen
                 查询：「{result.query}」。每条推荐都对应真实菜谱，缺失食材与替代建议都来自检索结果，没有数量编造。
               </p>
               <MetaBar result={result} />
+              {result.recommendations.some((item) => item.time_minutes === null) ? (
+                <p className="text-xs leading-relaxed text-stone-600">
+                  卡片上的「耗时未知」表示上游 HowToCook 数据源没有提供烹饪时长；本项目如实标注未知，不做估算填充。
+                </p>
+              ) : null}
             </div>
 
             <DegradationNotice result={result} />

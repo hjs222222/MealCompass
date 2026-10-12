@@ -12,6 +12,9 @@ style_source: /styles/natural-organic
 - 组件统一放 `frontend/components/ui/`（项目不使用 `src/` 前缀）。
 - 字体：标题 `font-serif`（中文推荐 Noto Serif SC / 思源宋体），正文 `font-sans` 系统 UI 字体栈或 Noto Sans SC；**不引入 Inter / Roboto / Geist**。
 - **形状例外说明**：按钮 / 输入框 / 标签的 `rounded-full`（pill）是本文档 REQUIRED 明确要求的，允许使用；「禁止使用完美的圆形/矩形」针对的是装饰性几何形状与卡片（卡片一律 `rounded-[2rem]`）。
+- **技术性标识必须折叠（2026-10-12 新增）**：主键、UUID、内部降级标签等**面向开发者**的标识不得直接占据卡片主视觉层。需要保留可核对性时，折叠进 `<details>` 披露入口（展开后可复制，剪贴板不可用时退化为手动选中），折叠触发器与复制按钮的触控高度 ≥ 44px。
+
+> **变更 v1.2（2026-10-12）**：新增「技术性标识必须折叠」约定——推荐卡片曾把完整 `recipe_id` 原样渲染在耗时标签旁（W3.11），对普通用户没有阅读价值。
 
 > **变更 v1.1（2026-10-06）**：新增本节，明确本文档是前端样式唯一事实源，并与 `CONVENTIONS.md` 的 Tailwind / shadcn 约定对齐。
 
