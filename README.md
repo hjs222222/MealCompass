@@ -566,7 +566,7 @@ $ .venv\Scripts\python.exe -m scripts.check_docs_consistency
 
 ## 🗺️ 路线图
 
-**2026-10-11 起收敛为 3 周聚焦**（原 4-6 周全量计划见 `TODO.md` 归档区）：
+**2026-10-11 起收敛为 3 周聚焦**（原 4-6 周全量计划见 `docs/HISTORICAL_FULL_PLAN.md`）：
 
 | 周 | 目标 | 出口条件 |
 | --- | --- | --- |
@@ -593,7 +593,8 @@ $ .venv\Scripts\python.exe -m scripts.check_docs_consistency
 | [`docs/INTERVIEW.md`](./docs/INTERVIEW.md) | **面试深挖问答方案**（每个技术点的问题、答案、与代码位置） |
 | [`docs/failed-features.md`](./docs/failed-features.md) | 未完成功能与环境受限项登记（不假装可用） |
 | [`docs/mistakes.md`](./docs/mistakes.md) | 踩坑与解决过程记录 |
-| [`TODO.md`](./TODO.md) | 待办与排期 |
+| [`TODO.md`](./TODO.md) | 当前三周计划与后续立项入口 |
+| [`docs/HISTORICAL_FULL_PLAN.md`](./docs/HISTORICAL_FULL_PLAN.md) | 三周聚焦前的完整产品计划归档（不计入当前进度） |
 
 ---
 
