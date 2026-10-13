@@ -167,12 +167,21 @@ async def test_node_parse_maps_llm_json_to_hard_filters() -> None:
 
 async def test_node_parse_explicit_filters_win_over_llm() -> None:
     llm = FakeLLM([PARSE_JSON])
-    explicit = HardFilters(max_time_minutes=45, excluded_ingredients=["花生"])
+    explicit = HardFilters(max_time_minutes=45, excluded_ingredients=["花生"], category="drink")
     delta = await node_parse({"query": "随便", "filters": explicit}, deps(FakeRetriever(), llm))
 
     assert delta["filters"].max_time_minutes == 45
     assert delta["filters"].tools_available == ["炒锅"]  # 显式没给，用 LLM 补
     assert delta["filters"].excluded_ingredients == ["花生"]
+    assert delta["filters"].category == "drink"
+
+
+async def test_node_parse_keeps_explicit_category_when_llm_fails() -> None:
+    delta = await node_parse(
+        {"query": "清爽一点", "filters": HardFilters(category="drink")},
+        deps(FakeRetriever(), FakeLLM(boom=True)),
+    )
+    assert delta["filters"].category == "drink"
 
 
 async def test_node_parse_retries_then_degrades_on_garbage() -> None:

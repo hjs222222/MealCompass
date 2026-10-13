@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { RecipeImages } from "@/components/recommend-results";
 import { ApiError, fetchRecipePage } from "@/lib/api";
+import { parseRecipeExtra } from "@/lib/recipe-extra";
 
 export const metadata: Metadata = {
   title: "完整菜谱 · MealCompass",
@@ -27,6 +29,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
   }
 
   const details = recipe.details;
+  const extraBlocks = details.extra ? parseRecipeExtra(details.extra, details.images, details.external_images) : [];
   return (
     <article className="space-y-8">
       <header className="space-y-4">
@@ -47,12 +50,17 @@ export default async function RecipePage({ params }: { params: { id: string } })
         <h2 className="font-serif text-2xl text-stone-800">原料与用量</h2>
         {details.servings_text ? <p className="mt-2 text-sm text-stone-600">份量：{details.servings_text}</p> : null}
         {details.ingredients.length > 0 ? (
-          <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-relaxed text-stone-700">
+          <ul className="mt-4 space-y-2 text-sm leading-relaxed text-stone-700">
             {details.ingredients.map((ingredient, index) => (
-              <li key={`${ingredient.name}-${index}`} className="break-words">
-                {ingredient.name}{ingredient.amount_text ? ` · ${ingredient.amount_text}` : " · 用量未注明"}
-                {ingredient.per_serving ? "（每份）" : ""}{ingredient.optional ? "（可选）" : ""}
-                {ingredient.note ? ` · ${ingredient.note}` : ""}
+              <li key={`${ingredient.name}-${index}`}>
+                <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl px-2 py-2 hover:bg-stone-100">
+                  <input type="checkbox" className="peer mt-1 h-4 w-4 shrink-0 accent-stone-700" />
+                  <span className="break-words peer-checked:text-stone-500 peer-checked:line-through">
+                    {ingredient.name}{ingredient.amount_text ? ` ${ingredient.amount_text}` : ""}
+                    {ingredient.per_serving ? "（每份）" : ""}{ingredient.optional ? "（可选）" : ""}
+                    {ingredient.note ? ` ${ingredient.note}` : ""}
+                  </span>
+                </label>
               </li>
             ))}
           </ul>
@@ -77,10 +85,20 @@ export default async function RecipePage({ params }: { params: { id: string } })
         ) : <p className="mt-4 text-sm text-stone-600">暂无做法步骤。</p>}
       </section>
 
-      {details.extra ? (
+      {extraBlocks.length > 0 ? (
         <section className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8">
           <h2 className="font-serif text-2xl text-stone-800">附加说明</h2>
-          <p className="mt-4 whitespace-pre-line break-words text-sm leading-relaxed text-stone-700">{details.extra}</p>
+          <div className="mt-4 space-y-4 text-sm leading-relaxed text-stone-700">
+            {extraBlocks.map((block, index) => {
+              if (block.kind === "heading") return <h3 key={index} className="font-serif text-lg text-stone-800">{block.text}</h3>;
+              if (block.kind === "image") return (
+                <figure key={index} className="overflow-hidden rounded-[2rem] bg-stone-100">
+                  <Image src={block.src} alt={block.alt || recipe.name} width={960} height={720} sizes="(max-width: 768px) 100vw, 768px" className="h-auto w-full object-contain" unoptimized />
+                </figure>
+              );
+              return <p key={index} className="whitespace-pre-line break-words">{block.text}</p>;
+            })}
+          </div>
         </section>
       ) : null}
       {details.source_url && /^https:\/\//i.test(details.source_url) ? (

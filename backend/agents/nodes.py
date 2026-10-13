@@ -122,6 +122,7 @@ def _merge_filters(explicit: HardFilters | None, parsed: HardFilters) -> HardFil
         max_time_minutes=(base.max_time_minutes if base.max_time_minutes is not None else parsed.max_time_minutes),
         tools_available=base.tools_available or parsed.tools_available,
         excluded_ingredients=list(dict.fromkeys([*base.excluded_ingredients, *parsed.excluded_ingredients])),
+        category=base.category,
     )
 
 

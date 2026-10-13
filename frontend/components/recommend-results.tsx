@@ -5,7 +5,8 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-import { API_BASE_URL, ApiError, type RecipeDetails, type RecommendResponse, type Recommendation } from "@/lib/api";
+import { ApiError, type RecipeDetails, type RecommendResponse, type Recommendation } from "@/lib/api";
+import { localImageUrl } from "@/lib/recipe-extra";
 
 /**
  * 降级标签 → 人话。
@@ -132,14 +133,6 @@ function DegradationNotice({ result }: { result: RecommendResponse }) {
       )}
     </div>
   );
-}
-
-function localImageUrl(path: string): string | null {
-  const segments = path.replaceAll("\\", "/").split("/");
-  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
-    return null;
-  }
-  return `${API_BASE_URL}/recipe-images/${segments.map(encodeURIComponent).join("/")}`;
 }
 
 function RecipeImage({ src, name }: { src: string; name: string }) {

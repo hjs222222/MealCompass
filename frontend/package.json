@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:unit": "tsc lib/api.ts lib/recommend-session.ts lib/display-settings.ts --module commonjs --target es2022 --outDir ../.tmp/frontend-tests --esModuleInterop --skipLibCheck --types node && node --test tests/*.test.mjs"
+    "test:unit": "tsc lib/api.ts lib/recommend-session.ts lib/display-settings.ts lib/recipe-extra.ts --module commonjs --target es2022 --outDir ../.tmp/frontend-tests --esModuleInterop --skipLibCheck --types node && node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.16",
