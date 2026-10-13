@@ -534,13 +534,13 @@ pnpm typecheck && pnpm lint && pnpm test:unit && pnpm build
 
 **覆盖率口径说明**：只统计生产代码（`domain/rag/infra/core/api/agents/services/main.py`），**不把 `tests/` 与 `scripts/` 算进去**——否则覆盖率会被测试自身稀释。门禁 `--cov-fail-under=70`。
 
-**本机实测（2026-10-11，重灌数据后 / 补齐覆盖率测试后）**：
+**当前本机基线（2026-10-13）**：
 
 ```
 $ .venv\Scripts\python.exe -m pytest -q -p no:cacheprovider --cov=domain --cov=rag --cov=infra \
     --cov=core --cov=api --cov=agents --cov=services --cov=main --cov-report=term
-TOTAL                              1669     66    96%
-547 passed, 4 skipped in 53.24s
+TOTAL                              1890     93    95%
+589 passed, 4 skipped in 60.84s
 $ .venv\Scripts\python.exe -m ruff check .          → All checks passed!
 $ .venv\Scripts\python.exe -m ruff format --check . → 94 files already formatted
 $ .venv\Scripts\python.exe -m scripts.check_docs_consistency
@@ -550,13 +550,13 @@ $ .venv\Scripts\python.exe -m scripts.check_docs_consistency
      指标格 12 个全部覆盖；区间格子与跨轮极差一致；来源标注全部存在
 ```
 
-覆盖率**最低的三个模块也一并说清，不藏**（补齐前的旧值 → 现在）：
+覆盖率**当前最低的三个模块也一并说清，不藏**：
 
 | 模块 | 补齐前 | 现在 | 说明 |
 | --- | --- | --- | --- |
-| `infra/db.py` | 64% | **100%** | `create_async_engine` 是**惰性**的，单测不需要真库；用假 session 覆盖了 commit / rollback / 建连失败三条分支 |
-| `infra/observability.py` | 75% | **94%** | 注入假 langfuse 模块覆盖「启用路径」；剩下 6 行是 SDK 真发请求后的分支 |
-| `api/deps.py` | 80% | **100%** | 装配链（engine → corpus → retriever → service）+ 关闭失败只记日志的分支 |
+| `infra/recipe_details.py` | — | **52%** | 独立详情页新增后，数据库读取成功路径已有覆盖，真实 SQL 映射分支仍需后续集成测试补强 |
+| `infra/rerank_client.py` | — | **88%** | 远端和本地模型客户端的异常分支仍有少量环境相关缺口 |
+| `agents/jsonx.py` | — | **89%** | 脏 JSON 解析已经覆盖常见边界，复杂嵌套异常文本仍留有分支缺口 |
 
 > `4 skipped` 是**环境性跳过**（本地兜底模型 `sentence-transformers` 未安装、真远程 smoke 需 key），不是失败；每一条的跳过原因写在测试里。
 

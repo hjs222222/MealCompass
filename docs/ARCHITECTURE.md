@@ -4,6 +4,7 @@
 > **性质**：草案，不是宪法。允许迭代，每次迭代必须记录原因。
 > **用途**：喂给 AI Coding 工具作为架构约束基线。
 > **原则**：模块化单体 > 微服务；抽象接口先行；能少一个组件就少一个。
+> **范围说明（2026-10-13）**：目录图与模块表同时保留完整产品目标和当前实现。当前三周交付只包含知识库/RAG、最小 Agent 闭环、推荐页、独立菜谱详情、可观测与证据；鉴权、画像、购物清单、反馈、会话持久化和 YAML 规则引擎均为未排期的未来范围。实际状态以 `README.md`「当前状态」和 `TODO.md` §0.5 为准。
 
 ## 一、目录架构（怎么分层）
 
@@ -138,9 +139,7 @@ mealcompass/
 └── README.md
 ```
 
-> **前端落地进度（2026-10-09，T1.17/T1.18）**：上面的 `frontend/` 是**目标**结构，当前只落了骨架与数据层：
-> `app/{layout,page,loading,error}.tsx`、`app/(auth)/login/`、`app/(main)/dashboard/`、`components/{providers,status-panel}.tsx`、`lib/api.ts`、`lib/query-client.ts`、`lib/hooks/`、`lib/stores/`。
-> 尚未创建：`recommend` / `chat` / `recipe` / `cook` / `shopping` / `history` / `profile` / `onboarding` / `legal` 页面，以及 `components/ui/`（shadcn/ui）。未完成项登记在 `docs/failed-features.md`。
+> **前端落地进度（2026-10-13）**：上面的 `frontend/` 是完整产品的**目标**结构。当前已实现 `app/(main)/recommend/`、`app/(main)/recipe/[id]/`、`dashboard/` 与禁用的 `login/` 演示页，另有根页、加载/错误边界、`components/{providers,status-panel,recommend-*}`、`lib/api.ts`、`lib/query-client.ts`、`lib/hooks/`、`lib/stores/`。`chat` / `cook` / `shopping` / `history` / `profile` / `onboarding` / `legal` 与 `components/ui/`（shadcn/ui）均未实现，状态登记在 `docs/failed-features.md`。
 >
 > **前端边界契约**：`app/layout.tsx` 保持 Server Component；`components/providers.tsx` 是唯一客户端 Provider 边界（QueryClientProvider）。服务端状态只走 TanStack Query（`lib/hooks/`），客户端 UI 状态只走 Zustand（`lib/stores/`），两者不混。`lib/api.ts` 是唯一 HTTP 出口，错误统一归一化为 `ApiError`。
 
@@ -311,7 +310,7 @@ shopping_lists (
 )
 ```
 
-### 3.2 规则配置（YAML，不入库）
+### 3.2 规则配置（YAML，不入库；完整产品规划，当前未实现）
 
 ```yaml
 # data/rules/default.yaml
@@ -335,7 +334,7 @@ soft_preferences:
     boost: 1.2
 ```
 
-**为什么规则用 YAML 不用 DB**：可版本控制、可评审、非技术人员可改、无需迁移。未来需要热更新再迁 DB。
+**为什么规则用 YAML 不用 DB**：可版本控制、可评审、非技术人员可改、无需迁移。未来需要热更新再迁 DB。当前三周交付的硬约束由请求参数与检索层 SQL 直接承接，`data/rules/` 尚不存在。
 
 ### 3.3 索引策略
 
@@ -483,6 +482,7 @@ class RerankClient(Protocol):
 | v1.16 | 2026-10-13 | 新增 `GET /recipes/{recipe_id}`、`RecipePageReader` 与 `/recipe/[id]`；详情按真实 ID 读取，推荐卡片不再内嵌完整原料与步骤 | 用户从推荐卡片进入完整菜谱后需要独立网址，便于刷新与分享 |
 
 | v1.17 | 2026-10-13 | 推荐页快照保存在同标签页 `sessionStorage`；根布局增加全站外观设置，偏好保存在 `localStorage`；Node 内置测试运行器验证持久化序列化 | 页面跳转卸载推荐组件导致结果和输入重置；用户需要自主调整阅读方式 |
+| v1.18 | 2026-10-13 | 标注目录图、规则 YAML 与前端页面表的“完整产品目标 / 三周实际交付”边界；修正前端落地说明为 `/recommend` 和 `/recipe/[id]` 已实现 | 旧架构说明仍说推荐页和详情页未创建，又把 YAML 规则与多页面目标误读成当前实现；三周计划完成后，入口文档必须先给出现实状态，再保留未来架构设计 |
 
 **迭代规则**：
 
@@ -524,14 +524,17 @@ class RerankClient(Protocol):
 - 不把硬约束判断交给 LLM
 ```
 
-## 八、待定问题（v0.2 已全部定稿）
+## 八、完整产品扩展的已定设计（当前三周范围外）
 
 | 问题         | 选项                 | **已定结论（v0.2）**                                  |
+
+> 本节保留完整产品恢复开发时的技术决策，不表示对应能力已在当前三周交付中落地；实际状态以 README 的能力表为准。
+
 | ------------ | -------------------- | ----------------------------------------------------- |
 | 规则热更新   | YAML 文件 vs DB      | **YAML 文件**（`data/rules/`），量大再迁 DB           |
 | 会话存储     | PG JSONB vs Redis    | **PostgresSaver 为唯一事实源**，Redis 只做缓存与限流  |
 | 前端 SSR/CSR | 全 SSR vs 混合       | **混合**：推荐 / 对话 / 购物清单 CSR，落地页 / 详情页 SSR |
-| 评估触发     | 手动 vs CI           | **先手动**（`scripts/eval.py`），M2 稳定后再入 CI     |
+| 评估触发     | 手动 vs CI           | **先手动**（`scripts/eval.py`）；未来扩展时再决定是否加入定时任务 |
 | 语音         | Web Speech vs 第三方 | **Web Speech API**，零成本                            |
 
 ---
