@@ -46,6 +46,7 @@
 - [X] **W3.13 一键启动脚本（2026-10-12）**：`start_mealcompass.bat` + `scripts/start_mealcompass.ps1`，双击即自检环境、起前后端、就绪后打印可点击网址；子命令 `check` / `status` / `stop` / `open` / `reload`。自检覆盖依赖、端口占用（打印占用进程）、数据库 TCP 可达（连不上尝试 `docker compose up -d postgres`）、上次残留进程；日志被占时自动换时间戳文件名；`next dev` 的 `spawn EPERM` 自动降级为生产模式；后端 `--reload` 改为 opt-in（具名管道受限环境会失败）。实测：pwsh 7.6 与 PowerShell 5.1 下 `check` 均 exit 0，真实启动 4 个网址全 HTTP 200，`stop` 后端口释放。
 - [X] **W3.14 演示前体验修复（2026-10-12）**：① 修复"不要南瓜"却推荐山药南瓜炖鸡汤——根因是食材词表缺"南瓜"+别名（小南瓜≠南瓜），补 aliases.yaml 并 DB 回填 ingredient_id；② HardFilters/RecommendRequest 加 `category` 字段并 SQL 下推，前端加 8 个中文分类快捷按钮；③ 删厨具选择 UI 与"所需工具"区块（上游 tools 恒为空，类型保留）；④ 删"按烹饪时长筛选（暂不可用）"占位块；⑤ 卡片 reason 不再暴露"混合检索第 N 名"系统术语，GENERATE prompt 改为"必须恰好 N 条"减少 shortfall；⑥ 热量标签去掉"（HowToCook 预估）"后缀；⑦ logging.py 加 RotatingFileHandler（5MB×3）；⑧ DEGRADATION_LABELS 补 recommendation_shortfall 中文释义。后端 580 passed、前端 typecheck/lint/build 全绿。
 - [X] **W3.15 忌口跨名称漏网修复（2026-10-13）**：针对猪肉 trace `ac1136dd07eb2d66abe1de9435397fc1` 和南瓜 trace `4a1f9a8ca618906c7db30ce21bea9630`，确认解析已提取忌口、漏点在检索允许 ID 集合。SQL 下推增加菜名检查和词典同义名展开，覆盖五花肉条等未映射原料、番茄酱/番茄膏等衍生产物及西红柿写法；上游原文已明确土豆的炸薯条也通过词典关联名排除。真实数据库回归覆盖事故菜谱，并断言「不要猪肉」保留牛里脊菜。无需重灌或重建向量。
+- [X] **W3.16 忌口事故面试复盘（2026-10-13）**：`docs/INTERVIEW.md` Q3.2 记录猪肉/南瓜 trace 的定位证据、精确等值→局部 LIKE→检索前多字段+同义名判定的修复过程、牛里脊误伤反例与真库回归；Q6.2 区分保守入库归一化与忌口匹配语义，并删除已过期的「仍待修」说法及绝对安全承诺。
 
 **明确不做（三周内）**：注册登录、购物清单、一周菜单、烹饪指导模式、语音、长期记忆、多智能体、A/B 实验、付费。
 
