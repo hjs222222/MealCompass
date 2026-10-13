@@ -38,7 +38,7 @@ const NODE_LABELS: Record<string, string> = {
   reflect: "反思重试",
 };
 
-const CARD_CLASS = "rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8";
+const CARD_CLASS = "rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8";
 const TAG_CLASS = "inline-flex items-center rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600";
 
 function describeError(error: Error): string {
@@ -57,13 +57,13 @@ function describeError(error: Error): string {
 function LoadingSkeleton() {
   return (
     <div aria-busy="true" className="space-y-6">
-      <div className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8">
+      <div className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8">
         <div className="h-6 w-52 rounded-full bg-stone-200" />
         <div className="mt-4 h-4 w-64 rounded-full bg-stone-200" />
       </div>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
         {[0, 1].map((index) => (
-          <div key={index} className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8">
+          <div key={index} className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8">
             <div className="h-6 w-32 rounded-full bg-stone-200" />
             <div className="mt-4 h-4 w-full rounded-full bg-stone-200" />
             <div className="mt-2 h-4 w-4/5 rounded-full bg-stone-200" />
@@ -291,7 +291,7 @@ export function RecommendResults({ result, error, isPending, onRetry }: Recommen
 
             <DegradationNotice result={result} />
 
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
+            <div className="recommend-grid grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
               {result.recommendations.map((item) => (
                 <RecommendationCard key={item.recipe_id} item={item} />
               ))}

@@ -3,6 +3,7 @@
 import { useId, useState, type ChangeEvent, type FormEvent } from "react";
 
 import type { RecommendRequest } from "@/lib/api";
+import type { RecommendDraft } from "@/lib/recommend-session";
 
 /** 与 backend/domain/models/recommend.py 的字段约束逐项对齐。 */
 const QUERY_MAX_LENGTH = 200;
@@ -47,6 +48,8 @@ type FieldErrors = {
 export type RecommendFormProps = {
   onSubmit: (payload: RecommendRequest) => void;
   isSubmitting: boolean;
+  draft: RecommendDraft;
+  onDraftChange: (draft: RecommendDraft) => void;
 };
 
 /** 中文逗号、顿号、换行也当分隔符——用户不会只打英文逗号。 */
@@ -72,16 +75,13 @@ function parseIntegerInRange(raw: string, min: number, max: number): number | nu
   return value;
 }
 
-export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
+export function RecommendForm({ onSubmit, isSubmitting, draft, onDraftChange }: RecommendFormProps) {
   const fieldId = useId();
   const queryId = `${fieldId}-query`;
   const excludedId = `${fieldId}-excluded`;
   const topKId = `${fieldId}-top-k`;
 
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<string | null>(null);
-  const [excludedRaw, setExcludedRaw] = useState("");
-  const [topK, setTopK] = useState("3");
+  const { query, category, excludedRaw, topK } = draft;
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
@@ -121,7 +121,7 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
       onSubmit={handleSubmit}
       noValidate
       aria-busy={isSubmitting}
-      className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8"
+      className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8"
     >
       <h2 className="font-serif text-xl text-stone-800 md:text-2xl">告诉我你想吃什么</h2>
       <p className="mt-2 text-sm leading-relaxed text-stone-600">
@@ -142,7 +142,7 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
             required
             maxLength={QUERY_MAX_LENGTH}
             value={query}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => onDraftChange({ ...draft, query: event.target.value })}
             aria-invalid={errors.query !== undefined}
             aria-describedby={`${queryId}-hint`}
             placeholder="例如：想吃家常菜，不要香菜"
@@ -178,7 +178,7 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
                     name="category"
                     value={option.slug}
                     checked={checked}
-                    onChange={() => setCategory(checked ? null : option.slug)}
+                    onChange={() => onDraftChange({ ...draft, category: checked ? null : option.slug })}
                     className="h-4 w-4 accent-stone-800"
                   />
                   <span>{option.label}</span>
@@ -201,7 +201,7 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
               max={TOP_K_MAX}
               step={1}
               value={topK}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setTopK(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => onDraftChange({ ...draft, topK: event.target.value })}
               aria-invalid={errors.topK !== undefined}
               aria-describedby={`${topKId}-hint`}
               className={`mt-2 ${INPUT_CLASS}`}
@@ -225,7 +225,7 @@ export function RecommendForm({ onSubmit, isSubmitting }: RecommendFormProps) {
             name="excluded_ingredients"
             rows={2}
             value={excludedRaw}
-            onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setExcludedRaw(event.target.value)}
+            onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onDraftChange({ ...draft, excludedRaw: event.target.value })}
             aria-describedby={`${excludedId}-hint`}
             placeholder="例如：香菜, 花生、牛奶"
             className={`mt-2 ${TEXTAREA_CLASS}`}

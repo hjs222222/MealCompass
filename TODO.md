@@ -48,6 +48,7 @@
 - [X] **W3.15 忌口跨名称漏网修复（2026-10-13）**：针对猪肉 trace `ac1136dd07eb2d66abe1de9435397fc1` 和南瓜 trace `4a1f9a8ca618906c7db30ce21bea9630`，确认解析已提取忌口、漏点在检索允许 ID 集合。SQL 下推增加菜名检查和词典同义名展开，覆盖五花肉条等未映射原料、番茄酱/番茄膏等衍生产物及西红柿写法；上游原文已明确土豆的炸薯条也通过词典关联名排除。真实数据库回归覆盖事故菜谱，并断言「不要猪肉」保留牛里脊菜。无需重灌或重建向量。
 - [X] **W3.16 忌口事故面试复盘（2026-10-13）**：`docs/INTERVIEW.md` Q3.2 记录猪肉/南瓜 trace 的定位证据、精确等值→局部 LIKE→检索前多字段+同义名判定的修复过程、牛里脊误伤反例与真库回归；Q6.2 区分保守入库归一化与忌口匹配语义，并删除已过期的「仍待修」说法及绝对安全承诺。
 - [X] **W3.17 推荐卡片与独立菜谱详情（2026-10-13）**：移除「还缺的食材」栏目、菜谱 ID 折叠入口与配图说明；ID 置于卡片右上角，菜名和完整菜谱入口均导航至 `/recipe/[id]`；`GET /recipes/{recipe_id}` 支持直接访问和刷新，详情展示原料、可用工具、步骤、附加说明及图片。
+- [X] **W3.18 推荐页状态与外观设置（2026-10-13）**：同标签页 `sessionStorage` 保留表单草稿、最后一次请求和推荐结果，详情页返回/前进不重复调用 Agent，新搜索替换旧结果；右上角外观面板可调字体、字号、舒展双列/单列阅读排版、三套自然暖色主题，偏好保存在 `localStorage`。前端状态序列化 4 项 Node 内置测试进入 CI。
 
 **明确不做（三周内）**：注册登录、购物清单、一周菜单、烹饪指导模式、语音、长期记忆、多智能体、A/B 实验、付费。
 
@@ -159,7 +160,7 @@
 - [X] **T1.16 异常/日志** `[MVP]`：`core/exceptions.py`、`core/logging.py` 结构化日志
 - [X] **T1.17 前端骨架** `[MVP]`：`frontend/` 落地（Next.js 14 App Router，不带 `src/`）。路由组 `(auth)/login` + `(main)/dashboard`，另有 `/`、`loading.tsx`、`error.tsx`；`app/layout.tsx` 保持 Server Component，`components/providers.tsx` 是唯一客户端边界；Natural Organic token 写在 `app/globals.css` 的 `@theme`（不生成 `tailwind.config.js`）。**`pnpm typecheck && pnpm lint && pnpm build` 三项 exit 0**，4 条路由全部预渲染；`pnpm start` 后 `/`、`/dashboard`、`/login` 实测 HTTP 200
 - [X] **T1.18 前端数据层** `[MVP]`：`lib/api.ts`（`fetchHealth` / `fetchVersion` + `ApiError`，字段用类型守卫校验、8s 超时、错误消息不泄露响应体）、`lib/query-client.ts`、`lib/hooks/use-system-status.ts`（TanStack Query）、`lib/stores/ui.ts`（Zustand 只存 UI 状态）、`components/status-panel.tsx`（加载 / 错误 / 重试 / 紧凑模式）。**已真启动 FastAPI 验证契约**：`/health`、`/version` 字段与类型逐项一致；`api.ts` 编译产物对真实后端跑通「正常 / 网络不可达 / 非 2xx」三条路径
-- [ ] **T1.17b 前端自动化测试基线** `[P1]`：0 个前端测试，`lib/api.ts` 与 `StatusPanel` 的状态分支没有回归保护。**前置：先定测试框架选型**（`TECH_STACK` 未列前端测试框架）。详见 `docs/failed-features.md` F5/F6
+- [ ] **T1.17b 前端自动化测试基线** `[P1]`：已有 4 项状态序列化纯函数测试；`lib/api.ts` 其他守卫、`StatusPanel` 分支与浏览器点击流仍缺自动化覆盖。**前置：先定组件/浏览器测试框架选型**（`TECH_STACK` 未列此类框架）。详见 `docs/failed-features.md` F5/F6
 
 ### 4.4 M1 验收
 

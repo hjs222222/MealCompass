@@ -13,7 +13,7 @@ export default function RecommendPage() {
       <header className="space-y-3">
         <h1 className="font-serif text-3xl tracking-tight text-stone-800 md:text-4xl">今天吃什么</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-stone-600 md:text-base">
-          写下需求、时间上限、可用厨具和忌口，页面会调用{" "}
+          写下需求，按需选择菜谱分类、推荐条数和忌口。页面会调用{" "}
           <code className="font-mono text-xs">POST /recommend</code>
           ，由后端 Agent 做硬约束检索 + 理由生成。硬约束不可满足时后端会显式返回「无解」原因，页面不会把空结果当成功。
         </p>

@@ -437,6 +437,8 @@ class RerankClient(Protocol):
 
 **推荐菜谱详情展示（W3.12、W3.17）**：`domain.ports.RecipeDetailsReader.get_details(recipe_ids)` 批量读取最终引用 ID 的菜谱详情；`infra.recipe_details.SqlRecipeDetailsReader` 读取原料份量、工具、步骤、附加说明、图片及来源，并由纯函数提取简介中明确的原文总时长文本（保留约值/区间）。Agent 完成引用校验后，service 只为最终 ID 补充 `Recommendation.details`。独立页面 `/recipe/[id]` 通过 `GET /recipes/{recipe_id}` 与 `RecipePageReader`/`RecipePageService` 按 ID 重新读取，支持直接访问和刷新；推荐卡片标题与完整菜谱入口均链接该页。图片通过受限 `/recipe-images/{path}` 静态端点提供；路径越界、非图片后缀和不存在文件返回 404。读取详情失败保留推荐并标记 `recipe_details_unavailable`。步骤详情展示不代表步骤向量参与召回，F21 仍未实现。
 
+**推荐页状态与阅读设置（W3.18）**：`recommend-client.tsx` 将表单草稿、最后一次请求与推荐响应保存为当前浏览器标签页的 `sessionStorage` 快照；页面返回/前进后恢复快照而不重复调用后端，新搜索替换旧结果。全站导航中的 `DisplaySettingsControl` 将外观偏好保存在 `localStorage`，通过根元素 `data-font/size/layout/theme` 与 `globals.css` 作用于页面；单列模式同时收窄正文宽度与推荐卡片列数，无服务端会话或新依赖。
+
 **接口约束**：
 
 - 所有 IO 操作 `async`
@@ -479,6 +481,8 @@ class RerankClient(Protocol):
 | v1.15 | 2026-10-13 | `rag/retriever.py` 在生成两个召回通道的允许 ID 集合时，先用 `aliases.yaml` 展开忌口标准名与同义名，再用转义后的包含匹配检查 `recipes.name`、`recipe_ingredients.name_raw`、已映射标准名和别名；跨其他食材名称有歧义的短别名不作宽泛展开；词典增加经上游原文证实的「薯条」→「土豆」；仍在 SQL 层排除，不改变索引文本与向量 | 先前的 `LIKE` 只查原料关联行：当前库里「五花肉条」未映射，菜名「猪肉烩酸菜」也未进入谓词，导致已有修复后仍漏猪肉；「西红柿」与「番茄酱」跨标准名也会漏。直接展开全部猪肉别名还会误伤「牛里脊」，需保留本质区分 |
 
 | v1.16 | 2026-10-13 | 新增 `GET /recipes/{recipe_id}`、`RecipePageReader` 与 `/recipe/[id]`；详情按真实 ID 读取，推荐卡片不再内嵌完整原料与步骤 | 用户从推荐卡片进入完整菜谱后需要独立网址，便于刷新与分享 |
+
+| v1.17 | 2026-10-13 | 推荐页快照保存在同标签页 `sessionStorage`；根布局增加全站外观设置，偏好保存在 `localStorage`；Node 内置测试运行器验证持久化序列化 | 页面跳转卸载推荐组件导致结果和输入重置；用户需要自主调整阅读方式 |
 
 **迭代规则**：
 

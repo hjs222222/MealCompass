@@ -8,7 +8,7 @@ type CardProps = {
 
 function Card({ title, children }: CardProps) {
   return (
-    <section className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8">
+    <section className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8">
       <h2 className="font-serif text-xl text-stone-800 md:text-2xl">{title}</h2>
       <div className="mt-3 text-sm leading-relaxed text-stone-600 md:text-base">{children}</div>
     </section>

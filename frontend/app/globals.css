@@ -26,7 +26,32 @@
 @layer base {
   html {
     color-scheme: light;
+    --reader-bg: #faf6f1;
+    --reader-surface: #faf6f1;
+    --reader-footer: #ffffff;
   }
+
+  html[data-theme="sage"] {
+    --reader-bg: #edf1e7;
+    --reader-surface: #f6f8f1;
+    --reader-footer: #e6ecdf;
+  }
+
+  html[data-theme="clay"] {
+    --reader-bg: #f8eee7;
+    --reader-surface: #fff6ef;
+    --reader-footer: #f2e4d9;
+  }
+
+  html[data-size="large"] { font-size: 18px; }
+  html[data-size="xlarge"] { font-size: 20px; }
+
+  html[data-font="serif"] .font-sans,
+  html[data-font="serif"] input,
+  html[data-font="serif"] textarea,
+  html[data-font="serif"] select { font-family: var(--font-serif); }
+
+  html[data-font="sans"] .font-serif { font-family: var(--font-sans); }
 
   body {
     background-color: #faf6f1;
@@ -38,6 +63,17 @@
     outline: 2px solid #8b9d77;
     outline-offset: 2px;
   }
+}
+
+@layer components {
+  .theme-page-bg { background-color: var(--reader-bg); }
+  .theme-surface { background-color: var(--reader-surface); }
+  .theme-footer { background-color: var(--reader-footer); }
+}
+
+@layer utilities {
+  html[data-layout="list"] .recommend-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-layout="list"] .page-main { max-width: 48rem; }
 }
 
 /* 纸张/织物纹理：UI_STYLE 明确要求（CSS 实现），极低对比度、不使用冷色 */

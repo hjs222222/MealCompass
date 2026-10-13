@@ -28,12 +28,12 @@
 | LangGraph 最小闭环（parse → search → generate → validate） | ✅ 已实现 | `backend/agents/` |
 | `POST /recommend`、`POST /recipes/search` 接口 | ✅ 已实现 | `backend/api/v1/recommend.py` |
 | 混合检索消融实验（纯向量 / 混合 / 混合+重排） | ✅ **已实测**，数字见 [评估结果](#-评估结果) | `data/eval/`、`backend/scripts/eval.py` |
-| 前端推荐页 `/recommend` | ✅ 已实现 | `frontend/app/(main)/recommend/` |
+| 前端推荐页 `/recommend` | ✅ 已实现 | `frontend/app/(main)/recommend/`；返回详情后保留本标签页的输入与结果，浏览器点击证据见 `docs/evidence/browser_return_state_2026-10-13.txt` |
 | 规则引擎 YAML 化（`data/rules/`） | 🚧 未实现 | 目录不存在；当前约束由请求参数直接给 |
 | 澄清追问 / 反思重试 / 多轮对话 | 🚧 未实现 | 无 `MemorySaver`/`PostgresSaver` 会话持久化接线 |
 | 注册登录（邮箱 + JWT） | 🚧 未实现 | `/login` 仍是禁用占位表单 |
 | 菜谱详情 `/recipe/[id]` | ✅ 已实现 | `GET /recipes/{recipe_id}` 按 ID 读取原料、步骤与配图；购物清单 / 一周菜单仍未实现 |
-| 前端自动化测试 | 🚧 未实现 | 仓库内 0 个前端测试 |
+| 前端自动化测试 | ⚠️ 部分实现 | 4 项状态序列化测试已进入 CI；浏览器点击流仍未覆盖 |
 
 > 未完成、未验证、被环境挡住的东西，逐项登记在 [`docs/failed-features.md`](./docs/failed-features.md)——**不假装可用**。
 > 踩坑与解决过程登记在 [`docs/mistakes.md`](./docs/mistakes.md)。
@@ -296,7 +296,7 @@ cd backend
 | **接口定义** | 所有 Protocol 集中在 `domain/ports.py`（`RecipeRepository` / `LLMClient` / `EmbeddingClient` / `RerankClient` / `Retriever`），实现在 `infra/`、`rag/` |
 | **前端目录** | 不使用 `src/` 前缀：`app/`、`components/ui/`、`lib/` 直接放在 `frontend/` 下 |
 | **渲染策略** | 推荐 / 对话 / 购物清单 = CSR（client + TanStack Query）；落地页 / 菜谱详情 / legal = Server Component（SSR） |
-| **样式** | Natural Organic（`docs/UI_STYLE.md`）；Tailwind v4 CSS-first，token 定义在 `app/globals.css` 的 `@theme`，不生成 `tailwind.config.js` |
+| **样式** | Natural Organic（`docs/UI_STYLE.md`）；Tailwind v4 CSS-first，token 定义在 `app/globals.css` 的 `@theme`，不生成 `tailwind.config.js`。右上角可调字体、字号、页面排列与暖色主题，设置保存在浏览器本地 |
 | **数据源** | 菜谱来自 HowToCook（Unlicense / 公有领域，可自由分发与商用）。372 道菜谱 + 354 张成品配图收录进 `data/raw/howtocook/` 并随仓库提交；上游完整 clone（623 MB）不入库 |
 | **模型调用** | **远程优先、本地兜底**：Embedding / Rerank 默认走 SiliconFlow 等 OpenAI 兼容接口，失败或离线时回落本地推理；实现在 `infra/`，接口在 `domain/ports.py`，trace 里标注实际走的是哪条路。⚠️ 本地兜底需装 `sentence-transformers`，**当前环境未安装** |
 | **硬约束归属** | 忌口 / 时间 / 厨具**下推到检索层**（SQL WHERE / 向量过滤），禁止「先检索再过滤」；LLM 不参与硬约束判定。忌口按食材本质处理：标准名、同义名及含该名称的部位/衍生产物均排除；SQL 同时检查菜名、原料原文与已映射食材，不能只依赖入库时的归一化。跨食材有歧义的短别名不做宽泛包含匹配（如「里脊」不能因此把牛里脊算猪肉） |
@@ -529,7 +529,7 @@ cd backend
 
 # 前端：类型检查 + Lint + 构建
 cd frontend
-pnpm typecheck && pnpm lint && pnpm build
+pnpm typecheck && pnpm lint && pnpm test:unit && pnpm build
 ```
 
 **覆盖率口径说明**：只统计生产代码（`domain/rag/infra/core/api/agents/services/main.py`），**不把 `tests/` 与 `scripts/` 算进去**——否则覆盖率会被测试自身稀释。门禁 `--cov-fail-under=70`。
@@ -601,7 +601,7 @@ $ .venv\Scripts\python.exe -m scripts.check_docs_consistency
 
 1. Fork 本仓库
 2. 创建功能分支 `git checkout -b feature/xxx`
-3. 提交前确保 `ruff`、`pytest`、`pnpm typecheck && pnpm lint && pnpm build` 全绿
+3. 提交前确保 `ruff`、`pytest`、`pnpm typecheck && pnpm lint && pnpm test:unit && pnpm build` 全绿
 4. 提交 PR，描述变更内容与原因
 5. 行为变更必须同步更新文档与 `docs/mistakes.md`
 

@@ -363,7 +363,7 @@ function parseRecipeCandidate(payload: unknown): RecipeCandidate | null {
   };
 }
 
-function parseRecommendResponse(payload: unknown): RecommendResponse | null {
+export function parseRecommendResponse(payload: unknown): RecommendResponse | null {
   if (!isRecord(payload)) {
     return null;
   }

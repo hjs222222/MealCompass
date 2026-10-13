@@ -56,7 +56,7 @@ export function StatusPanel() {
   return (
     <section
       aria-labelledby="status-panel-title"
-      className={`rounded-[2rem] border border-stone-200 bg-[#faf6f1] ${compactMode ? "p-4" : "p-6 md:p-8"}`}
+      className={`rounded-[2rem] border border-stone-200 theme-surface ${compactMode ? "p-4" : "p-6 md:p-8"}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 id="status-panel-title" className="font-serif text-xl text-stone-800 md:text-2xl">

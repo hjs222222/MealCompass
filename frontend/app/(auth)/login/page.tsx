@@ -16,7 +16,7 @@ export default function LoginPage() {
         </p>
       </header>
 
-      <section className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8">
+      <section className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8">
         <p className="rounded-full border border-stone-200 bg-white px-4 py-2 text-xs text-stone-600">
           以下表单仅为样式占位，全部控件已禁用，不会发出任何请求。
         </p>

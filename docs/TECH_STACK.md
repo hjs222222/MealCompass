@@ -1,10 +1,11 @@
 
-# MealCompass 技术栈清单（v1.2）
+# MealCompass 技术栈清单（v1.3）
 
 > **用途**：喂给 AI Coding 工具（Cursor / Copilot / Claude 等），作为项目开发的技术边界约束。
 > **选型原则**：成熟优先、社区资料丰富、AI 训练数据覆盖度高、本科生可在 4-6 周内独立完成。
 > **阅读说明**：✅ 表示 AI 训练数据覆盖充分；⚠️ 表示资料中等，需注意版本兼容。
 > **变更 v1.2（2026-10-11）**：总览表新增**「实装状态」列**。原因是 v1.0/v1.1 把**规划中**的依赖和**已在用**的依赖混在一张表里，读者会以为 RAGAS / Sentry / shadcn/ui 都在跑。三周聚焦后口径收敛为：**只有代码里真的 import 了、且真机跑通过的才算「在用」**，其余标注状态并指向 [`failed-features.md`](./failed-features.md)。
+> **变更 v1.3（2026-10-13）**：前端状态纯函数测试使用 Node.js 20+ 内置 `node:test`，不新增依赖；组件与浏览器自动化框架仍待选型。
 > **变更 v1.1（2026-10-06）**：统一跨文档冲突（分层目录、接口位置、前端目录、可观测降级），全局口径见 [`../README.md`](../README.md) 的「全局约定（唯一口径）」。
 
 ## 一、技术栈总览
@@ -29,6 +30,7 @@
 | **UI 组件**    | shadcn/ui                  | latest                  | 📋 **仅规划** | `components/ui/` 为空，当前全部手写 Tailwind → [F7](./failed-features.md) |
 | **服务端状态** | TanStack Query             | v5                      | ✅ 在用 | 缓存/重取/错误处理标准化                        |
 | **客户端状态** | Zustand                    | v5                      | ✅ 在用 | 轻量，学习成本低                                |
+| **前端状态测试** | Node.js 内置 `node:test` | Node 20+ | ✅ 在用 | 快照序列化测试进入 CI，无新依赖；浏览器自动化仍待选型 |
 | **可观测**     | Langfuse Cloud             | `langfuse-python` ≥ 4.17.0 | ✅ 在用（真机 trace 已确认 GENERATION + usage） | LLM 链路追踪；读取走 Observations API v2        |
 | **错误监控**   | Sentry                     | —                       | 📋 **仅规划** | 无任何 SDK 调用，异常只进本地日志 → [F18](./failed-features.md) |
 | **评估框架**   | RAGAS                      | latest                  | 📋 **仅规划** | 只评了检索侧，RAGAS 四项没跑 → [F11](./failed-features.md) |

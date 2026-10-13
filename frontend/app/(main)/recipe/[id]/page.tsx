@@ -18,7 +18,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
       notFound();
     }
     return (
-      <div className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8" role="alert">
+      <div className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8" role="alert">
         <h1 className="font-serif text-2xl text-stone-800">暂时无法读取菜谱</h1>
         <p className="mt-3 text-sm text-stone-600">请确认后端正在运行，稍后刷新页面。</p>
         <Link href="/recommend" className="mt-5 inline-flex min-h-[44px] items-center text-stone-800 underline underline-offset-4">返回推荐</Link>
@@ -43,7 +43,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
 
       <RecipeImages name={recipe.name} details={details} />
 
-      <section className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8">
+      <section className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8">
         <h2 className="font-serif text-2xl text-stone-800">原料与用量</h2>
         {details.servings_text ? <p className="mt-2 text-sm text-stone-600">份量：{details.servings_text}</p> : null}
         {details.ingredients.length > 0 ? (
@@ -60,7 +60,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
       </section>
 
       {details.tools.length > 0 ? (
-        <section className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8">
+        <section className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8">
           <h2 className="font-serif text-2xl text-stone-800">所需工具</h2>
           <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-stone-700">
             {details.tools.map((tool, index) => <li key={`${tool}-${index}`}>{tool}</li>)}
@@ -68,7 +68,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
         </section>
       ) : null}
 
-      <section className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8">
+      <section className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8">
         <h2 className="font-serif text-2xl text-stone-800">做法步骤</h2>
         {details.steps.length > 0 ? (
           <ol className="mt-4 list-decimal space-y-4 pl-5 text-sm leading-relaxed text-stone-700">
@@ -78,7 +78,7 @@ export default async function RecipePage({ params }: { params: { id: string } })
       </section>
 
       {details.extra ? (
-        <section className="rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8">
+        <section className="rounded-[2rem] border border-stone-200 theme-surface p-6 md:p-8">
           <h2 className="font-serif text-2xl text-stone-800">附加说明</h2>
           <p className="mt-4 whitespace-pre-line break-words text-sm leading-relaxed text-stone-700">{details.extra}</p>
         </section>
