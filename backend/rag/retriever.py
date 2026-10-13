@@ -15,14 +15,17 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import lru_cache
 from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from domain.ingredients import IngredientDictionary, clean_name
 from domain.models.retrieval import HardFilters, RecipeCandidate
 from infra.db import get_engine
+from infra.ingredient_dict import load_dictionary
 from infra.observability import ObservationType, SpanName, traced
 from infra.tables import ingredient_aliases, ingredients, recipe_embeddings, recipe_ingredients, recipes
 from rag.corpus import CardCorpus
@@ -31,6 +34,38 @@ from rag.reranker import rerank_candidates
 
 VECTOR_TOP_N = 50  # 向量通道召回数（PRD F-B3：Top 50）
 BM25_TOP_N = 50  # 关键词通道召回数（PRD F-B3：Top 50）
+
+
+@lru_cache(maxsize=1)
+def _ingredient_dictionary() -> IngredientDictionary:
+    return load_dictionary()
+
+
+def _exclusion_patterns(excluded: str) -> tuple[str, ...]:
+    """Expand a forbidden ingredient to its known names before SQL filtering."""
+    name = clean_name(excluded).lower()
+    if not name:
+        return ()
+    dictionary = _ingredient_dictionary()
+    entry = dictionary.resolve(name)
+    terms = [name]
+    if entry:
+        terms.append(entry.name)
+        other_names = {
+            clean_name(variant).lower()
+            for other in dictionary.entries()
+            if other.name != entry.name
+            for variant in (other.name, *other.aliases)
+        }
+        # 「里脊」也在「牛里脊」中；不把这种有明确其他食材归属的短别名展开成包含匹配。
+        terms.extend(
+            alias for alias in entry.aliases if not any(clean_name(alias).lower() in other for other in other_names)
+        )
+    patterns = []
+    for term in dict.fromkeys(terms):
+        escaped = term.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        patterns.append(f"%{escaped}%")
+    return tuple(patterns)
 
 
 class HybridRetriever:
@@ -150,19 +185,17 @@ class HybridRetriever:
             available = sa.cast(filters.tools_available, JSONB)
             conditions.append(recipes.c.tools.op("<@")(available))
         for excluded in filters.excluded_ingredients:
-            # Match PostgreSQL lower(column) semantics; casefold can transform characters (e.g. ẞ -> ss)
-            # that lower() preserves differently, producing a false negative in the SQL predicate.
-            #
-            # 用 LIKE '%x%' 包含匹配而非精确等值：食材写法千变万化（番茄酱/番茄膏/小南瓜/猪五花肉），
-            # 用户说"不要番茄"时，名称里包含"番茄"的都算番茄（衍生产物/部位同理）。
-            # LIKE 通配符 % 和 _ 需要转义，避免用户输入被当通配符。
-            normalized = excluded.lower()
-            escaped = normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            pattern = f"%{escaped}%"
+            patterns = _exclusion_patterns(excluded)
+            if not patterns:
+                continue
+            # 菜名兜住缺失/未映射的原料行；原料原文及标准名兜住名称不同的衍生产物。
+            title_match = sa.or_(*(sa.func.lower(recipes.c.name).like(pattern, escape="\\") for pattern in patterns))
             match = sa.or_(
-                sa.func.lower(ingredients.c.name).like(pattern),
-                sa.func.lower(recipe_ingredients.c.name_raw).like(pattern),
-                sa.func.lower(ingredient_aliases.c.alias).like(pattern),
+                *(
+                    sa.func.lower(column).like(pattern, escape="\\")
+                    for column in (ingredients.c.name, recipe_ingredients.c.name_raw, ingredient_aliases.c.alias)
+                    for pattern in patterns
+                )
             )
             exists = (
                 sa.select(1)
@@ -174,7 +207,7 @@ class HybridRetriever:
                 .where(recipe_ingredients.c.recipe_id == recipes.c.id, match)
                 .exists()
             )
-            conditions.append(~exists)
+            conditions.append(~sa.or_(title_match, exists))
         return sa.select(recipes.c.id).where(*conditions)
 
     async def _allowed_recipe_ids(self, filters: HardFilters | None) -> set[str] | None:

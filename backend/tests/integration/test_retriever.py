@@ -156,6 +156,34 @@ async def test_retriever_applies_hard_filters_to_sql_universe() -> None:
         await engine.dispose()
 
 
+@requires_db
+async def test_exclusions_reject_reported_pork_pumpkin_and_tomato_recipes() -> None:
+    engine = create_async_engine(get_settings().database_url)
+    cases = {
+        "猪肉": {"香煎五花肉", "咕噜肉", "回锅肉", "白菜猪肉炖粉条", "猪肉烩酸菜"},
+        "南瓜": {"山药南瓜炖鸡汤"},
+        "番茄": {"番茄红酱"},
+        "西红柿": {"番茄红酱"},
+        "土豆": {"炸薯条"},
+    }
+    try:
+        async with engine.connect() as conn:
+            rows = (await conn.execute(sa.select(recipes.c.id, recipes.c.name))).all()
+        by_name = {row.name: str(row.id) for row in rows}
+        if any(name not in by_name for names in cases.values() for name in names):
+            pytest.skip("测试数据库缺少事故菜谱")
+        retriever = HybridRetriever.__new__(HybridRetriever)
+        retriever._engine = engine
+        for excluded, forbidden_names in cases.items():
+            allowed = await retriever._allowed_recipe_ids(HardFilters(excluded_ingredients=[excluded]))
+            assert allowed is not None
+            assert not {by_name[name] for name in forbidden_names} & allowed, excluded
+            if excluded == "猪肉" and "小炒黄牛肉" in by_name:
+                assert by_name["小炒黄牛肉"] in allowed
+    finally:
+        await engine.dispose()
+
+
 async def test_retriever_empty_query_returns_empty() -> None:
     retriever = HybridRetriever(embedder=FixedVectorEmbedder([0.0] * 1024), corpus=CardCorpus([]))
     assert await retriever.search("   ") == []

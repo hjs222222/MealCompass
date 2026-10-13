@@ -476,6 +476,8 @@ class RerankClient(Protocol):
 
 | v1.14 | 2026-10-12 | HardFilters / RecommendRequest / SearchRequest 新增 `category: str | None` 字段并 SQL 下推到 `recipes.category`（已有 `ix_recipes_category` 索引）；`core/logging.py` 加 `RotatingFileHandler`（5MB×3，写 `.tmp/logs/mealcompass.log`）；食材词表补「南瓜」标准食材 + [小南瓜/金瓜/倭瓜/番瓜/南瓜块/南瓜泥] 别名，修复"不要南瓜"仍推荐山药南瓜炖鸡汤的硬约束漏过滤 | ① `recipes.category` 列早已存在但检索层没接，前端无法按分类筛；② 日志只有 stderr 被启动脚本重定向到固定文件，无轮转；③ 食材写法差异（小南瓜≠南瓜）+ 词表缺条目导致忌口硬约束漏菜，这是 demo 级信任事故 |
 
+| v1.15 | 2026-10-13 | `rag/retriever.py` 在生成两个召回通道的允许 ID 集合时，先用 `aliases.yaml` 展开忌口标准名与同义名，再用转义后的包含匹配检查 `recipes.name`、`recipe_ingredients.name_raw`、已映射标准名和别名；跨其他食材名称有歧义的短别名不作宽泛展开；词典增加经上游原文证实的「薯条」→「土豆」；仍在 SQL 层排除，不改变索引文本与向量 | 先前的 `LIKE` 只查原料关联行：当前库里「五花肉条」未映射，菜名「猪肉烩酸菜」也未进入谓词，导致已有修复后仍漏猪肉；「西红柿」与「番茄酱」跨标准名也会漏。直接展开全部猪肉别名还会误伤「牛里脊」，需保留本质区分 |
+
 **迭代规则**：
 
 1. 每次架构变更必须在此表登记

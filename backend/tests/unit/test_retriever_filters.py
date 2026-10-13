@@ -72,7 +72,7 @@ def test_hard_filter_sql_compiles_time_tools_and_case_insensitive_ingredients() 
     assert "lower(ingredients.name)" in sql
     assert "lower(recipe_ingredients.name_raw)" in sql
     assert "lower(ingredient_aliases.alias)" in sql
-    assert "not (exists" in sql
+    assert "not (" in sql and "exists" in sql
     # LIKE 包含匹配：参数带 % 通配符
     assert "%虾%" in compiled.params.values()
 
@@ -85,6 +85,29 @@ def test_excluded_ingredient_normalization_matches_sql_lower_semantics() -> None
 
     # LIKE 包含匹配：参数是 %abc% 形式
     assert "%abc%" in compiled.params.values()
+
+
+def test_pork_exclusion_checks_recipe_name_and_unmapped_cut_names() -> None:
+    retriever = HybridRetriever.__new__(HybridRetriever)
+    statement = retriever._allowed_recipe_statement(HardFilters(excluded_ingredients=["猪肉"]))
+
+    compiled = statement.compile(dialect=postgresql.dialect())
+    sql = str(compiled).lower()
+
+    assert "lower(recipes.name)" in sql
+    assert "%五花肉%" in compiled.params.values()
+    assert "%猪肉%" in compiled.params.values()
+    assert "%里脊%" not in compiled.params.values()  # 牛里脊不是猪肉
+
+
+def test_tomato_alias_exclusion_covers_tomato_sauce() -> None:
+    retriever = HybridRetriever.__new__(HybridRetriever)
+    statement = retriever._allowed_recipe_statement(HardFilters(excluded_ingredients=["西红柿"]))
+
+    compiled = statement.compile(dialect=postgresql.dialect())
+
+    assert "%番茄%" in compiled.params.values()
+    assert "%西红柿%" in compiled.params.values()
 
 
 def test_empty_hard_filters_do_not_add_sql_predicates() -> None:
