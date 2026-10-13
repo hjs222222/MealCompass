@@ -19,3 +19,9 @@ class RecipeDetails(BaseModel):
     external_images: list[str] = Field(default_factory=list)
     extra: str | None = None
     source_url: str | None = None
+
+
+class RecipePage(BaseModel):
+    recipe_id: str
+    name: str
+    details: RecipeDetails

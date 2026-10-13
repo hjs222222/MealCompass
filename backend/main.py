@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from api.deps import close_recommend_service
 from api.v1.health import router as health_router
+from api.v1.recipe import router as recipe_router
 from api.v1.recommend import router as recommend_router
 from core.config import Settings, get_settings
 from core.exceptions import AppError, ErrorResponse, request_id_context
@@ -145,6 +146,7 @@ def create_app(settings: Settings | None = None, *, include_test_routes: bool = 
     )
     application.include_router(health_router)
     application.include_router(recommend_router)
+    application.include_router(recipe_router)
 
     @application.get("/recipe-images/{image_path:path}", include_in_schema=False)
     async def recipe_image(image_path: str) -> FileResponse:

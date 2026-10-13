@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from domain.models.recipe import Ingredient
-from domain.models.recipe_details import RecipeDetails
+from domain.models.recipe_details import RecipeDetails, RecipePage
 from domain.recipe_time import extract_time_text
 from infra.tables import recipe_ingredients, recipe_steps, recipes
 
@@ -16,6 +17,16 @@ from infra.tables import recipe_ingredients, recipe_steps, recipes
 class SqlRecipeDetailsReader:
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
+
+    async def get_page(self, recipe_id: str) -> RecipePage | None:
+        async with self._engine.connect() as conn:
+            row = (await conn.execute(sa.select(recipes.c.name).where(recipes.c.id == UUID(recipe_id)))).first()
+        if row is None:
+            return None
+        details = (await self.get_details([recipe_id])).get(recipe_id)
+        if details is None:
+            return None
+        return RecipePage(recipe_id=recipe_id, name=row.name, details=details)
 
     async def get_details(self, recipe_ids: Sequence[str]) -> dict[str, RecipeDetails]:
         if not recipe_ids:

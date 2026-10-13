@@ -21,6 +21,7 @@ from infra.recipe_details import SqlRecipeDetailsReader
 from infra.rerank_client import build_rerank_client
 from rag.corpus import CardCorpus, load_card_documents
 from rag.retriever import HybridRetriever
+from services.recipe_page_service import RecipePageService
 from services.recommend_service import RecommendService
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,10 @@ async def get_recommend_service(settings: AppSettings) -> RecommendService:
             cached = await _build_service(settings)
             _services[key] = cached
     return cached
+
+
+def get_recipe_page_service() -> RecipePageService:
+    return RecipePageService(SqlRecipeDetailsReader(get_engine()))
 
 
 async def close_recommend_service() -> None:

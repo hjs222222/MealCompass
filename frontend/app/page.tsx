@@ -21,7 +21,7 @@ export default function HomePage() {
       <header className="space-y-3">
         <h1 className="font-serif text-3xl tracking-tight text-stone-800 md:text-4xl">MealCompass</h1>
         <p className="max-w-xl text-sm leading-relaxed text-stone-600 md:text-base">
-          按你的忌口、可用时间和厨具，推荐能真正做出来的家常菜。当前仓库处于 M1 阶段：推荐接口与页面已打通，登录、菜谱详情与购物清单仍未实现。
+          按你的忌口、可用时间和厨具，推荐家常菜，并可进入完整菜谱页面查看原料与做法。登录和购物清单仍未实现。
         </p>
       </header>
 
@@ -50,7 +50,7 @@ export default function HomePage() {
         <Card title="本阶段已完成">
           <ul className="list-disc space-y-1 pl-5">
             <li>Next.js App Router 骨架与路由组</li>
-            <li>类型安全 API 客户端（/health、/version、/recommend、/recipes/search）</li>
+            <li>类型安全 API 客户端（/health、/version、/recommend、/recipes/search、/recipes/[id]）</li>
             <li>TanStack Query 服务端状态 + Zustand 界面状态</li>
             <li>推荐接口 + Agent 闭环页面（规则硬约束检索 + LLM 生成理由的最小闭环）</li>
             <li>加载 / 空 / 错误 / 无解 / 降级状态与重试</li>

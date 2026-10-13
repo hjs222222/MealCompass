@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
 from domain.models.recipe import Recipe
-from domain.models.recipe_details import RecipeDetails
+from domain.models.recipe_details import RecipeDetails, RecipePage
 from domain.models.retrieval import HardFilters, RecipeCandidate
 
 
@@ -31,6 +31,13 @@ class RecipeRepository(Protocol):
 class RecipeDetailsReader(Protocol):
     async def get_details(self, recipe_ids: Sequence[str]) -> dict[str, RecipeDetails]:
         """Read authoritative content for validated IDs, including ordered steps."""
+        ...
+
+
+@runtime_checkable
+class RecipePageReader(Protocol):
+    async def get_page(self, recipe_id: str) -> RecipePage | None:
+        """Read one existing recipe by ID for a directly addressable page."""
         ...
 
 

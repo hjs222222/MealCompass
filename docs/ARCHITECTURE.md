@@ -435,7 +435,7 @@ class RerankClient(Protocol):
     async def rerank(self, query: str, docs: list[str], top_k: int = 10) -> list[tuple[int, float]]: ...
 ```
 
-**推荐菜谱详情展示（W3.12）**：`domain.ports.RecipeDetailsReader.get_details(recipe_ids)` 批量读取最终引用 ID 的菜谱详情；`infra.recipe_details.SqlRecipeDetailsReader` 读取原料份量、工具、步骤、附加说明、图片及来源，并由纯函数提取简介中明确的原文总时长文本（保留约值/区间）。Agent 完成引用校验后，service 只为最终 ID 补充 `Recommendation.details`，前端折叠展示完整菜谱卡片。图片通过受限 `/recipe-images/{path}` 静态端点提供；路径越界、非图片后缀和不存在文件返回 404。读取详情失败保留推荐并标记 `recipe_details_unavailable`。步骤详情展示不代表步骤向量参与召回，F21 仍未实现。
+**推荐菜谱详情展示（W3.12、W3.17）**：`domain.ports.RecipeDetailsReader.get_details(recipe_ids)` 批量读取最终引用 ID 的菜谱详情；`infra.recipe_details.SqlRecipeDetailsReader` 读取原料份量、工具、步骤、附加说明、图片及来源，并由纯函数提取简介中明确的原文总时长文本（保留约值/区间）。Agent 完成引用校验后，service 只为最终 ID 补充 `Recommendation.details`。独立页面 `/recipe/[id]` 通过 `GET /recipes/{recipe_id}` 与 `RecipePageReader`/`RecipePageService` 按 ID 重新读取，支持直接访问和刷新；推荐卡片标题与完整菜谱入口均链接该页。图片通过受限 `/recipe-images/{path}` 静态端点提供；路径越界、非图片后缀和不存在文件返回 404。读取详情失败保留推荐并标记 `recipe_details_unavailable`。步骤详情展示不代表步骤向量参与召回，F21 仍未实现。
 
 **接口约束**：
 
@@ -477,6 +477,8 @@ class RerankClient(Protocol):
 | v1.14 | 2026-10-12 | HardFilters / RecommendRequest / SearchRequest 新增 `category: str | None` 字段并 SQL 下推到 `recipes.category`（已有 `ix_recipes_category` 索引）；`core/logging.py` 加 `RotatingFileHandler`（5MB×3，写 `.tmp/logs/mealcompass.log`）；食材词表补「南瓜」标准食材 + [小南瓜/金瓜/倭瓜/番瓜/南瓜块/南瓜泥] 别名，修复"不要南瓜"仍推荐山药南瓜炖鸡汤的硬约束漏过滤 | ① `recipes.category` 列早已存在但检索层没接，前端无法按分类筛；② 日志只有 stderr 被启动脚本重定向到固定文件，无轮转；③ 食材写法差异（小南瓜≠南瓜）+ 词表缺条目导致忌口硬约束漏菜，这是 demo 级信任事故 |
 
 | v1.15 | 2026-10-13 | `rag/retriever.py` 在生成两个召回通道的允许 ID 集合时，先用 `aliases.yaml` 展开忌口标准名与同义名，再用转义后的包含匹配检查 `recipes.name`、`recipe_ingredients.name_raw`、已映射标准名和别名；跨其他食材名称有歧义的短别名不作宽泛展开；词典增加经上游原文证实的「薯条」→「土豆」；仍在 SQL 层排除，不改变索引文本与向量 | 先前的 `LIKE` 只查原料关联行：当前库里「五花肉条」未映射，菜名「猪肉烩酸菜」也未进入谓词，导致已有修复后仍漏猪肉；「西红柿」与「番茄酱」跨标准名也会漏。直接展开全部猪肉别名还会误伤「牛里脊」，需保留本质区分 |
+
+| v1.16 | 2026-10-13 | 新增 `GET /recipes/{recipe_id}`、`RecipePageReader` 与 `/recipe/[id]`；详情按真实 ID 读取，推荐卡片不再内嵌完整原料与步骤 | 用户从推荐卡片进入完整菜谱后需要独立网址，便于刷新与分享 |
 
 **迭代规则**：
 

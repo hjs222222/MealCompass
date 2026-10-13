@@ -54,6 +54,12 @@ export type RecipeDetails = {
   source_url: string | null;
 };
 
+export type RecipePage = {
+  recipe_id: string;
+  name: string;
+  details: RecipeDetails;
+};
+
 /** backend/domain/models/recommendation.py::Recommendation */
 export type Recommendation = {
   recipe_id: string;
@@ -289,6 +295,18 @@ function parseRecipeDetails(payload: unknown): RecipeDetails | null {
     extra: readNullableString(payload, "extra"),
     source_url: readNullableString(payload, "source_url"),
   };
+}
+
+function parseRecipePage(payload: unknown): RecipePage | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  const recipeId = readString(payload, "recipe_id");
+  const name = readString(payload, "name");
+  const details = parseRecipeDetails(payload.details);
+  return recipeId !== null && name !== null && details !== null
+    ? { recipe_id: recipeId, name, details }
+    : null;
 }
 
 function parseRecommendation(payload: unknown): Recommendation | null {
@@ -529,6 +547,17 @@ export async function fetchSearch(payload: SearchRequest): Promise<SearchRespons
   );
   if (parsed === null) {
     throw new ApiError("检索响应缺少必需字段或类型不符：/recipes/search", {
+      status: 200,
+      code: "invalid_payload",
+    });
+  }
+  return parsed;
+}
+
+export async function fetchRecipePage(recipeId: string): Promise<RecipePage> {
+  const parsed = parseRecipePage(await requestJson(`/recipes/${encodeURIComponent(recipeId)}`));
+  if (parsed === null) {
+    throw new ApiError("菜谱详情响应缺少必需字段或类型不符", {
       status: 200,
       code: "invalid_payload",
     });

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import Image from "next/image";
+import Link from "next/link";
 
-import { API_BASE_URL, ApiError, type RecommendResponse, type Recommendation } from "@/lib/api";
+import { API_BASE_URL, ApiError, type RecipeDetails, type RecommendResponse, type Recommendation } from "@/lib/api";
 
 /**
  * 降级标签 → 人话。
@@ -39,67 +40,6 @@ const NODE_LABELS: Record<string, string> = {
 
 const CARD_CLASS = "rounded-[2rem] border border-stone-200 bg-[#faf6f1] p-6 md:p-8";
 const TAG_CLASS = "inline-flex items-center rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-600";
-
-/**
- * 菜谱 ID 的折叠入口。
- *
- * `recipe_id` 是知识库主键（UUID），对普通用户没有阅读价值；但它同时是「引用防幻觉」的
- * 可核对凭据（`domain/citations.py` 只接受精确命中候选的 ID）。所以既不删除、也不再摆进
- * 卡片主视觉层：默认折叠，展开后可复制；剪贴板 API 不可用（非安全上下文）时退化为手动选中。
- */
-function RecipeIdDisclosure({ recipeId }: { recipeId: string }) {
-  const [copied, setCopied] = useState(false);
-  const [copyFailed, setCopyFailed] = useState(false);
-
-  useEffect(() => {
-    if (!copied && !copyFailed) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      setCopied(false);
-      setCopyFailed(false);
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [copied, copyFailed]);
-
-  async function handleCopy(): Promise<void> {
-    try {
-      if (typeof navigator === "undefined" || navigator.clipboard === undefined) {
-        throw new Error("clipboard api unavailable");
-      }
-      await navigator.clipboard.writeText(recipeId);
-      setCopyFailed(false);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-      setCopyFailed(true);
-    }
-  }
-
-  return (
-    <details className="mt-4 text-xs text-stone-600">
-      <summary className="min-h-[44px] cursor-pointer py-3 font-medium transition-colors duration-300 hover:text-stone-800">
-        查看菜谱 ID（用于核对引用）
-      </summary>
-      <div className="mt-1 flex flex-wrap items-center gap-3">
-        <code className="break-all font-mono text-[11px] text-stone-800">{recipeId}</code>
-        <button
-          type="button"
-          onClick={() => {
-            void handleCopy();
-          }}
-          aria-label="复制菜谱 ID"
-          className="min-h-[44px] rounded-full border border-stone-300 px-4 text-xs font-medium text-stone-700 transition-colors duration-300 hover:bg-stone-100"
-        >
-          {copied ? "已复制" : copyFailed ? "复制失败" : "复制 ID"}
-        </button>
-      </div>
-      <span role="status" aria-live="polite" className="sr-only">
-        {copied ? "菜谱 ID 已复制到剪贴板" : copyFailed ? "复制失败，请手动选中菜谱 ID 复制" : ""}
-      </span>
-    </details>
-  );
-}
 
 function describeError(error: Error): string {
   if (error instanceof ApiError) {
@@ -215,8 +155,7 @@ function RecipeImage({ src, name }: { src: string; name: string }) {
   );
 }
 
-function RecipeImages({ item }: { item: Recommendation }) {
-  const details = item.details;
+export function RecipeImages({ name, details }: { name: string; details: RecipeDetails | null }) {
   const sources = [
     ...(details?.images ?? []).map(localImageUrl).filter((url): url is string => url !== null),
     ...(details?.external_images ?? []).filter((url) => /^https:\/\/[^/]+/i.test(url)),
@@ -226,15 +165,14 @@ function RecipeImages({ item }: { item: Recommendation }) {
   }
   return (
     <figure className="mt-5">
-      <RecipeImage key={sources[0]} src={sources[0]} name={item.name} />
-      <figcaption className="mt-2 text-xs text-stone-600">HowToCook 菜谱配图</figcaption>
+      <RecipeImage key={sources[0]} src={sources[0]} name={name} />
       {sources.length > 1 ? (
         <details className="mt-2">
           <summary className="min-h-[44px] cursor-pointer py-3 text-sm text-stone-800 hover:text-stone-600">
             查看其余配图（{sources.length - 1} 张）
           </summary>
           <div className="space-y-4">
-            {sources.slice(1).map((src, index) => <RecipeImage key={`${src}-${index}`} src={src} name={item.name} />)}
+            {sources.slice(1).map((src, index) => <RecipeImage key={`${src}-${index}`} src={src} name={name} />)}
           </div>
         </details>
       ) : null}
@@ -242,66 +180,19 @@ function RecipeImages({ item }: { item: Recommendation }) {
   );
 }
 
-function RecipeDetailsContent({ item }: { item: Recommendation }) {
-  const details = item.details;
-  if (details === null) {
-    return <p className="mt-4 text-sm text-stone-600">暂未读取到菜谱详情。</p>;
-  }
-  return (
-    <details className="mt-5 border-t border-stone-200 pt-2">
-      <summary className="min-h-[44px] cursor-pointer py-3 text-sm font-medium text-stone-800 hover:text-stone-600">
-        查看完整菜谱（原料、工具与做法）
-      </summary>
-      <div className="space-y-5 text-sm leading-relaxed text-stone-700">
-        {details.description ? <p className="whitespace-pre-line break-words">{details.description}</p> : null}
-        <section>
-          <h4 className="font-serif text-base text-stone-800">原料与用量</h4>
-          {details.servings_text ? <p className="mt-1 text-stone-600">份量：{details.servings_text}</p> : null}
-          {details.ingredients.length > 0 ? (
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {details.ingredients.map((ingredient, index) => (
-                <li key={`${ingredient.name}-${index}`} className="break-words">
-                  {ingredient.name}{ingredient.amount_text ? ` · ${ingredient.amount_text}` : " · 用量未注明"}
-                  {ingredient.per_serving ? "（每份）" : ""}{ingredient.optional ? "（可选）" : ""}
-                  {ingredient.note ? ` · ${ingredient.note}` : ""}
-                </li>
-              ))}
-            </ul>
-          ) : <p className="mt-2 text-stone-600">暂无原料清单。</p>}
-        </section>
-          {/* 厨具字段在 RecipeDetails 类型里保留（后端契约不变），但 HowToCook 上游
-              数据不含 tools（import 后恒为 []），因此前端不再渲染"所需工具"区块。 */}
-        <section>
-          <h4 className="font-serif text-base text-stone-800">做法步骤</h4>
-          {details.steps.length > 0 ? (
-            <ol className="mt-2 list-decimal space-y-3 pl-5">
-              {details.steps.map((step, index) => <li key={`${item.recipe_id}-step-${index}`} className="whitespace-pre-line break-words pl-1">{step}</li>)}
-            </ol>
-          ) : <p className="mt-2 text-stone-600">暂无做法步骤。</p>}
-        </section>
-        {details.extra ? (
-          <section>
-            <h4 className="font-serif text-base text-stone-800">附加说明</h4>
-            <p className="mt-2 whitespace-pre-line break-words">{details.extra}</p>
-          </section>
-        ) : null}
-        {details.source_url && /^https:\/\//i.test(details.source_url) ? (
-          <a href={details.source_url} target="_blank" rel="noopener noreferrer" className="inline-block min-h-[44px] py-3 text-stone-800 underline underline-offset-4 hover:text-stone-600">
-            查看 HowToCook 原菜谱
-          </a>
-        ) : null}
-      </div>
-    </details>
-  );
-}
-
 function RecommendationCard({ item }: { item: Recommendation }) {
+  const recipeUrl = `/recipe/${encodeURIComponent(item.recipe_id)}`;
   return (
     <article className={CARD_CLASS}>
-      <h3 className="font-serif text-xl text-stone-800 md:text-2xl">{item.name}</h3>
+      <div className="flex flex-col items-end gap-2">
+        <code className="max-w-full break-all text-right text-[10px] leading-relaxed text-stone-500" title="菜谱 ID">{item.recipe_id}</code>
+        <h3 className="self-start font-serif text-xl text-stone-800 md:text-2xl">
+          <Link href={recipeUrl} className="rounded-lg underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-700">{item.name}</Link>
+        </h3>
+      </div>
       <p className="mt-3 text-sm leading-relaxed text-stone-600 md:text-base">{item.reason}</p>
 
-      <RecipeImages item={item} />
+      <RecipeImages name={item.name} details={item.details} />
       <div className="mt-4 flex flex-wrap gap-2" aria-label="菜谱信息">
         <span className={TAG_CLASS}>耗时：{item.details === null ? "详情暂未读取" : item.details.time_text || "原文未注明"}</span>
         <span className={TAG_CLASS}>难度：{item.details?.difficulty != null ? `${item.details.difficulty}/5` : "未知"}</span>
@@ -309,19 +200,9 @@ function RecommendationCard({ item }: { item: Recommendation }) {
           热量：{item.details?.calories_kcal != null ? `${item.details.calories_kcal} 大卡` : "未知"}
         </span>
       </div>
-      <RecipeDetailsContent item={item} />
-      <RecipeIdDisclosure recipeId={item.recipe_id} />
-
-      {item.missing_ingredients.length > 0 ? (
-        <div className="mt-4">
-          <h4 className="text-xs font-medium text-stone-800">还缺的食材</h4>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-stone-600">
-            {item.missing_ingredients.map((ingredient, index) => (
-              <li key={`${ingredient}-${index}`}>{ingredient}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <Link href={recipeUrl} className="mt-5 inline-flex min-h-[44px] items-center rounded-full border border-stone-300 px-5 py-3 text-sm font-medium text-stone-800 transition-colors duration-300 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-700">
+        查看完整菜谱（原料、工具与做法）
+      </Link>
 
       {item.substitutions.length > 0 ? (
         <div className="mt-4">
@@ -403,7 +284,7 @@ export function RecommendResults({ result, error, isPending, onRetry }: Recommen
                 为你找到 {result.recommendations.length} 道菜
               </h2>
               <p className="text-sm leading-relaxed text-stone-600">
-                查询：「{result.query}」。每条推荐都对应真实菜谱，缺失食材与替代建议都来自检索结果，没有数量编造。
+                查询：「{result.query}」。每条推荐都对应真实菜谱，点击菜名或查看完整菜谱可阅读原料与做法。
               </p>
               <MetaBar result={result} />
             </div>
